@@ -530,13 +530,15 @@ if __name__ == '__main__':
                 if (xselect):
                     xselect_pos -= 1 * factor
                 else:
-                    current = max(current - 10 * factor, 0)
+                    #current = max(current - 10 * factor, 0)
+                    current = current - 10 * factor
 
             elif action == 'down':
                 if xselect:
                     xselect_pos += 1 * factor
                 else:
-                    current = min(current + 10*factor, max(len(lst_matchesx) - rows + 1 * factor, 0))
+                    #current = min(current + 10*factor, max(len(lst_matchesx) - rows + 1 * factor, 0))
+                    current = current + 10*factor
 
             elif action == 'commit-show-info' and xselect:
                 xselect_entry = not xselect_entry
@@ -639,27 +641,44 @@ if __name__ == '__main__':
                 execbar = 'Execute command on commit ({}): {}'.format(exec_hash, str_exec)
                 display.add_line(DisplayPos.INFO, execbar)
 
+            str_debug = 'xspos: {} current: {} matches: {}'.format(xselect_pos, current, len(lst_matchesx))
             if str_debug:
                 debugbar = 'DEBUG: {}'.format(str_debug)
                 display.add_line(DisplayPos.INFO, debugbar)
 
             display.add_underline(DisplayPos.INFO)
 
-            if xselect_pos > len(lst_matchesx):
-                xselect_pos = 0
-            elif xselect_pos + current >= len(lst_matchesx):
-                xselect_pos -= 1 * factor
-
             if xselect_entry:
                 format_select(display, lst_matchesx[current + xselect_pos])
 
             max_log_lines = display.max_log_lines()
-            if xselect_pos >= max_log_lines:
-                xselect_pos = min(xselect_pos, max_log_lines)
-                current += 1 * factor
-            elif xselect_pos + current < current:
+
+            if xselect_pos >= len(lst_matchesx):
+                xselect_pos = len(lst_matchesx) - 1
+            elif xselect_pos >= max_log_lines - 1:
+                current += (xselect_pos - max_log_lines + 1)
+                xselect_pos = max_log_lines - 1
+            elif xselect_pos < 0:
+                current += xselect_pos # xselect_pos is negative
                 xselect_pos = 0
-                current = max(current - 1 * factor, 0)
+
+            current = max(current, 0) # limit current min value
+            current = min(current, max(len(lst_matchesx) - max_log_lines, 0)) # limit current max value
+
+            xselect_pos = max(xselect_pos, 0)
+            xselect_pos = min(xselect_pos, max_log_lines)
+
+            #if xselect_pos > current:
+            #    xselect_pos = 0
+            #elif xselect_pos + current >= len(lst_matchesx):
+            #    xselect_pos -= 1 * factor
+
+            #if xselect_pos >= max_log_lines:
+            #    xselect_pos = min(xselect_pos, max_log_lines - 1)
+            #    current += 1 * factor
+            #elif xselect_pos + current < current:
+            #    xselect_pos = 0
+            #    current = max(current - 1 * factor, 0)
 
             if xselect_diff:
                 (h, _, _, _, _, _, _, _, _) = lst_matchesx[current + xselect_pos]
