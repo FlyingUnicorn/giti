@@ -703,6 +703,6 @@ if __name__ == '__main__':
             if xselect:
                 xselect_pos += 1
             else:
-                current = min(current + 10, len(lst_matchesx) - rows)
+                current = min(current + 10, max(len(lst_matchesx) - rows, 0))
                 ich = 0
             continue
