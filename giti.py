@@ -8,7 +8,11 @@ import logging
 import string
 import re
 import time
+import threading
 from enum import Enum
+import queue
+
+
 
 log_entries = 25
 field_separator = '<|>'
@@ -109,7 +113,6 @@ def get_separators():
         str_sep[sep] = '|'
     #print(''.join(str_sep))
     return ''.join(str_sep)
-
 
 def pad(s, size, pos):
     l = visible_characters(s)
@@ -262,7 +265,6 @@ def gitlog(args, entries):
         lst_sorted.append(('  ---  ', e))
 
     return lst_sorted
-
 
 def getChar():
     # figure out which function to use once, and store it in _func
@@ -425,7 +427,7 @@ class Display:
         return self.rows - len(self.screenbuffer_info) - len(self.screenbuffer_select)
 
     def draw(self, selected_indx, select_active):
-
+        
         bg = self.palette.d[PaletteColors.BACKGROUND]
         fg = self.palette.d[PaletteColors.TEXT]
         select_bg = self.palette.d[PaletteColors.SELECT_BG] if select_active else self.palette.d[PaletteColors.SELECT_INACTIVE_BG]
@@ -451,12 +453,12 @@ class Display:
         for ln in self.screenbuffer_select:
             strbuf += bg + fg + pad(ln, self.columns, '<') + reset
 
+        display.clear()
         sys.stdout.writelines(strbuf)
         sys.stdout.flush()
         self.screenbuffer_info = []
         self.screenbuffer_log = []
         self.screenbuffer_select = []
-
 
 
 if __name__ == '__main__':
@@ -510,37 +512,115 @@ if __name__ == '__main__':
     meta = False
     str_debug = ''
     total_log_entries = None
+    consecutive_str = ''
+    consecutive_input = False
+
+    action = 'up'
     while (True):
 
-        updated = False
-        if str_filter != last_str_filter:
-            lst_matchesx = []
 
-            for major, e in lst_sorted:
-                matchx = get_valid_entry(str_filter, major, e)
+        if total_log_entries == None: total_log_entries = len(lst_matchesx) # first time only
 
-                if matchx:
-                    lst_matchesx.append(matchx)
+        if action or consecutive_input:
 
-            updated = True
-            last_str_filter = str_filter
+            factor = 3 if meta else 1
 
-        elif current != last_current:
-            if not lst_matchesx:
+            update = True
+            if action == 'up':
+                if (xselect):
+                    xselect_pos -= 1 * factor
+                else:
+                    current = max(current - 10 * factor, 0)
+
+            elif action == 'down':
+                if xselect:
+                    xselect_pos += 1 * factor
+                else:
+                    current = min(current + 10*factor, max(len(lst_matchesx) - rows + 1 * factor, 0))
+
+            elif action == 'commit-show-info' and xselect:
+                xselect_entry = not xselect_entry
+
+            elif action == 'commit-execute-command' and xselect:
+                consecutive_str = ''
+                consecutive_input = True
+                xexec = True
+
+            elif action == 'commit-show' and xselect:
+                xselect_diff = True
+
+            elif action == 'commit-select':
+                xselect = not xselect
+
+            elif action == 'esc' and (xfilter or xexec or xselect_entry):
+
+                if xfilter:
+                    xfilter = False
+                    consecutive_input = False
+                    consecutive_str = ''
+                    str_filter = ''
+
+                if xexec:
+                    xexec = False
+                    consecutive_input = False
+                    consecutive_str = ''
+                    str_exec = ''
+
+                if xselect_entry:
+                    xselect_entry = False
+
+            elif action == 'enter' and (xfilter or xexec):
+
+                if xfilter:
+                    xfilter = False
+                    #print('<< filter quit >>  '.format(str_filter), end='\r')
+
+                if xexec:
+                    xexec = False
+                    if str_exec:
+                        display.clear()
+                        cmd = '{} {}'.format(str_exec, exec_hash)
+                        print('command executed: {}'.format(cmd))
+                        subprocess.call(cmd, shell=True)
+                        sys.exit()
+                consecutive_input = False
+
+            elif action == 'search' and not xfilter:
+                consecutive_str = ''
+                consecutive_input = True
+                current = 0
+                xfilter = True
+
+            elif consecutive_input:
+                if xfilter:
+                    str_filter = consecutive_str
+                elif xexec:
+                    str_exec = consecutive_str
+            else:
+                update = False
+
+
+            if str_filter != last_str_filter:
+                lst_matchesx = []
+
                 for major, e in lst_sorted:
                     matchx = get_valid_entry(str_filter, major, e)
 
                     if matchx:
                         lst_matchesx.append(matchx)
 
-            last_current = current
-            updated = True
+                last_str_filter = str_filter
 
-        if total_log_entries == None: total_log_entries = len(lst_matchesx) # first time only
+            elif current != last_current:
+                if not lst_matchesx:
+                    for major, e in lst_sorted:
+                        matchx = get_valid_entry(str_filter, major, e)
 
-        if updated or xfilter != last_xfilter or xselect != last_xselect or xselect_pos != last_xselect_pos or xselect_entry != last_xselect_entry or xselect_diff or str_exec != last_str_exec or xexec != last_xexec:
-            display.clear()
-            
+                        if matchx:
+                            lst_matchesx.append(matchx)
+
+                last_current = current
+
             strsearch = display.color_text(PaletteColors.ACTIVE, 'search') if xfilter else display.color_text(PaletteColors.INACTIVE, 'search')
             strselect = display.color_text(PaletteColors.ACTIVE, 'select') if xselect else display.color_text(PaletteColors.INACTIVE, 'select')
             strexecute = display.color_text(PaletteColors.ACTIVE, 'execute') if xexec else display.color_text(PaletteColors.INACTIVE, 'execute')
@@ -562,29 +642,29 @@ if __name__ == '__main__':
             if str_debug:
                 debugbar = 'DEBUG: {}'.format(str_debug)
                 display.add_line(DisplayPos.INFO, debugbar)
-                
+
             display.add_underline(DisplayPos.INFO)
 
             if xselect_pos > len(lst_matchesx):
                 xselect_pos = 0
             elif xselect_pos + current >= len(lst_matchesx):
-                xselect_pos -= 1
+                xselect_pos -= 1 * factor
 
             if xselect_entry:
                 format_select(display, lst_matchesx[current + xselect_pos])
 
             max_log_lines = display.max_log_lines()
             if xselect_pos >= max_log_lines:
-                xselect_pos = min(xselect_pos, max_log_lines - 1)
-                current += 1
+                xselect_pos = min(xselect_pos, max_log_lines)
+                current += 1 * factor
             elif xselect_pos + current < current:
                 xselect_pos = 0
-                current = max(current - 1, 0)
+                current = max(current - 1 * factor, 0)
 
             if xselect_diff:
                 (h, _, _, _, _, _, _, _, _) = lst_matchesx[current + xselect_pos]
-                subprocess.call('git show {}'.format(h), shell=True)
                 xselect_diff = False
+                subprocess.call('git show {}'.format(h), shell=True)
 
             major_toggle = False
             last_major = ''
@@ -601,108 +681,63 @@ if __name__ == '__main__':
                 display.add_line(DisplayPos.LOG, logentry)
 
             display.draw(xselect_pos, xselect)
-            last_xfilter = xfilter
-            last_xselect = xselect
-            last_xselect_pos = xselect_pos
-            last_xselect_entry = xselect_entry
-            last_str_exec = str_exec
-            last_xexec = xexec
+            #last_xfilter = xfilter
+            #last_xselect = xselect
+            #last_xselect_pos = xselect_pos
+            #last_xselect_entry = xselect_entry
+            #last_str_exec = str_exec
+            #last_xexec = xexec
+
 
 
         meta = False
+
+        action = ''
         ch = getChar()
         ich = ord(ch[0])
-
-        #str_debug = 'input: "{}" > {}'.format(ch, ich)
-        #print('input: "{}" > {} e={}'.format(ch, ich, ch.encode()))
-
-        if ch == '/' and not xfilter:
-            current = 0
-            xfilter = True
-            continue
+        str_debug = ''
 
         if ich == 27:
-            # esc
-            if xfilter:
-                xfilter = False
-                str_filter = ''
+            meta = True
+            ch = getChar()
+            ich = ord(ch[0])
 
-            if xexec:
-                xexec = False
-                str_exec = ''
+        #str_debug += '{}/{} {}'.format(ch, ich, meta)
+        #print(str_debug)
 
-            if xselect_entry:
-                xselect_entry = False
+        if ich == 27: # esc
+            action = 'esc'
 
-            continue
+        elif ch == '\n':
+            action = 'enter'
 
-        if ich == 127:
-            # backspace
-            if xfilter:
-                str_filter = str_filter[:-1]
-            if xexec:
-                str_exec = str_exec[:-1]
-            ich = 0
-            continue
+        elif consecutive_input:
+            if ich == 127: # backspace
+                consecutive_str = consecutive_str[:-1]
+            else:
+                consecutive_str += ch
 
-        if ch == '\n':
-            if xfilter:
-                xfilter = False
-                print('<< filter quit >>  '.format(str_filter), end='\r')
+        elif ch == '/':
+            action = 'search'
 
-            if xexec:
-                xexec = False
-                if str_exec:
-                    display.clear()
-                    cmd = '{} {}'.format(str_exec, exec_hash)
-                    print('command executed: {}'.format(cmd))
-                    subprocess.call(cmd, shell=True)
-                    sys.exit()
-            continue
+        elif ch == 'd':
+            action = 'commit-show'
 
-        if xfilter:
-            ich = 0
-            str_filter += ch
-            continue
+        elif ch == ' ':
+            action = 'commit-select'
 
-        if xexec:
-            ich = 0
-            str_exec += ch
-            continue
+        elif ch == 'x':
+            action = 'commit-execute-command'
 
-        if xselect and ch == 'd':
-            xselect_diff = True
-            continue
+        elif ch == 'i':
+            action = 'commit-show-info'
 
-        if ch == ' ':
-            xselect = not xselect
-            continue
+        elif ch == 'p' or ich == 183: # p or arrow
+            action = 'up'
 
-        if ch == 'x' and xselect:
-            xexec = True
+        elif ch == 'n' or ich == 184: # n or arrow
+            action = 'down'
 
-        if xselect and ch == 'i':
-            xselect_entry = not xselect_entry
-            continue
-
-        if ch == 'q' and not xfilter:
+        elif ch == 'q' and not xfilter:
             display.clear()
             break
-
-        # p or arrow
-        if (ich == 112 or ich == 183) and not xfilter:
-            if (xselect):
-                xselect_pos -= 1
-            else:
-                current = max(current - 10, 0)
-                ich = 0
-            continue
-
-        # n or arrow
-        if (ich == 110 or ich == 184) and not xfilter:
-            if xselect:
-                xselect_pos += 1
-            else:
-                current = min(current + 10, max(len(lst_matchesx) - rows, 0))
-                ich = 0
-            continue
