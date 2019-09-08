@@ -8,43 +8,83 @@ import logging
 import string
 import re
 import time
-
-cmd_gituser = 'git config user.name'
-cmd_gitemail = 'git config user.email'
-field_separator= '<|>'
-entry_separator= '<||>'
-
-str_out_sep = ' | '
+from enum import Enum
 
 log_entries = 25
+field_separator = '<|>'
 
-# https://upload.wikimedia.org/wikipedia/commons/1/15/Xterm_256color_chart.svg
+class PaletteColors(Enum):
+    BACKGROUND          = 'background'
+    TEXT                = 'text'
+    TEXT_INPUT          = 'text_input'
+    TEXT_ALT1           = 'text_alt1'
+    TEXT_ALT2           = 'text_alt2'
+    AUTHOR              = 'author'
+    ACTIVE              = 'active'
+    INACTIVE            = 'inactive'
+    SELECT_BG           = 'select_bg'
+    SELECT_FG           = 'select_fg'
+    SELECT_INACTIVE_BG  = 'select_inactive_bg'
+    SELECT_INACTIVE_FG  = 'select_inactive_fg'
 
-WHITE = '\033[37m'
-CYAN = '\033[36m'
-#BLUE = '\033[1;36m'
-BLUE = '\033[{};2;{};{};{}m'.format(38, 0x87, 0xff, 0xaf)
-GREEN = '\033[92m'
-MAG = '\033[35m'
-RED = '\033[{};2;{};{};{}m'.format(38, 0x87, 0x00, 0x00)
-UNDERLINE = '\033[4m'
-STRIKETHROUGH = '\033[9m'
+class Palette:
+    def __init__(self, theme=None):
+        self.d = {}
 
-END = '\033[0m'
+        # https://upload.wikimedia.org/wikipedia/commons/1/15/Xterm_256color_chart.svg
+        self.d[PaletteColors.BACKGROUND]          = self.color('bg', '080808')
+        self.d[PaletteColors.TEXT]                = self.color('fg', 'c6c6c6')
+        self.d[PaletteColors.TEXT_INPUT]          = self.color('fg', '5fafd7')
+        self.d[PaletteColors.TEXT_ALT1]           = self.color('fg', 'af00af')
+        self.d[PaletteColors.TEXT_ALT2]           = self.color('fg', 'ff0087')
+        self.d[PaletteColors.AUTHOR]              = self.color('fg', '00d7ff')
+        self.d[PaletteColors.ACTIVE]              = self.color('fg', '00af00')
+        self.d[PaletteColors.INACTIVE]            = self.color('fg', 'd70000')
+        self.d[PaletteColors.SELECT_BG]           = self.color('bg', 'ffffff')
+        self.d[PaletteColors.SELECT_FG]           = self.color('fg', '080808')
+        self.d[PaletteColors.SELECT_INACTIVE_BG]  = self.color('bg', '808080')
+        self.d[PaletteColors.SELECT_INACTIVE_FG]  = self.color('fg', '080808')
 
-BG_RED = '\033[{};2;{};{};{}m'.format(48, 0x44, 0x44, 0x44)
-last_major = (BLUE, 0)
+        self.underline = '\033[4m'
+        self.reset     = '\033[0m'
 
-lst_fmt = ['\033[37m'
-           '\033[36m',
-           '\033[1;36m',
-           '\033[93m',
-           '\033[35m',
-           '\033[91m',
-           '\033[4m',
-           '\033[41m',
-           '\033[0m'
-]
+        if theme:
+            dirname = os.path.dirname(__file__)
+            filename = os.path.join(dirname, theme)
+            for line in open(filename):
+                ln = re.sub(r"\s+", '', line)
+                ln = ln.split('#')[0]
+                palette_color_str, color_code = ln.split('=')
+
+                if len(color_code) != 6:
+                    logging.error('Invalid format for line: "{}"'.format(line.strip()))
+                    sys.exit()
+
+                try:
+                    int(color_code, 16)
+                except ValueError:
+                    logging.error('Invalid format for line: "{}"'.format(line.strip()))
+                    sys.exit()
+
+                try:
+                    self.set_color(palette_color_str, color_code)
+                except ValueError:
+                    logging.error('Invalid format for line: \n >>> "{}"'.format(line.strip()))
+                    sys.exit()
+
+
+    def color(self, level, hex_clr):
+        level_code = 38 if level == 'fg' else 48
+        r = int(hex_clr[0:2], 16)
+        g = int(hex_clr[2:4], 16)
+        b = int(hex_clr[4:6], 16)
+        return '\033[{};2;{};{};{}m'.format(level_code, r, g, b)
+
+    def set_color(self, palette_color_str, color_code):
+        level = self.d[PaletteColors(palette_color_str)].split('\033[')[-1].split(';')[0]
+        level = 'fg' if level == '38' else 'bg'
+        self.d[PaletteColors(palette_color_str)] = self.color(level, color_code)
+
 
 def visible_characters(s):
 
@@ -106,7 +146,8 @@ def get_valid_entry(str_filter, major, entry):
 
     return (h, major, date, time, cr, an, ae, s, b)
 
-def get_formatted_entry(str_filter, columns, user_name, user_email, entry):
+def get_formatted_entry(display, str_filter, columns, user_name, user_email, entry, major_toggle):
+    str_out_sep = ' | '
 
     (h, m, d, t, cr, an, ae, s, _) = entry
     dct_fields = {
@@ -130,7 +171,7 @@ def get_formatted_entry(str_filter, columns, user_name, user_email, entry):
 
 
     if user_name == an and user_email == ae:
-        dct_fields['4-author'] = RED + dct_fields['4-author'] + WHITE
+        dct_fields['4-author'] = display.color_text(PaletteColors.AUTHOR, dct_fields['4-author'])
 
     if str_filter:
         str_search = ''
@@ -139,20 +180,12 @@ def get_formatted_entry(str_filter, columns, user_name, user_email, entry):
             for sub_str in str_filter.lower().split():
                 if re.search(sub_str, strval, re.IGNORECASE):
                     x = re.compile(re.escape(sub_str), re.IGNORECASE)
-                    strval = x.sub(CYAN + sub_str.upper() + WHITE, strval)
+                    strval = x.sub(display.color_text(PaletteColors.TEXT_INPUT, sub_str.upper()), strval)
 
             dct_fields[field] = strval
 
-    global last_major
-    (clr, last) = last_major
-    major = dct_fields['2-major']
-    if major != last:
-        if clr == BLUE:
-            clr = GREEN
-        else:
-            clr = BLUE
-        last_major = (clr, major)
-    dct_fields['2-major'] = clr + major + WHITE
+    text_alt_color = PaletteColors.TEXT_ALT1 if major_toggle else PaletteColors.TEXT_ALT2
+    dct_fields['2-major'] = display.color_text(text_alt_color, dct_fields['2-major'])
 
     strout = ''
     for field, strval in sorted(dct_fields.items()):
@@ -163,6 +196,7 @@ def get_formatted_entry(str_filter, columns, user_name, user_email, entry):
     return strout.strip()
 
 def gitlog(args, entries):
+    entry_separator= '<||>'
 
     #result = subprocess.run('stty size', stdout=subprocess.PIPE, shell=True)
     #result = result.stdout.decode('utf-8').strip().split()
@@ -210,7 +244,7 @@ def gitlog(args, entries):
         #except IndexError:
         #    str_body = ''
 
-        if str_an == 'Gateway' and 'Version update ' in str_subject:
+        if 'Gateway' in str_an and 'Version update ' in str_subject:
             major = str_subject.split('Version update ')[-1]
             lst_major.append((last_major, lst_entries))
             last_major = major
@@ -249,6 +283,7 @@ def getChar():
                 try:
                     tty.setcbreak(fd)
                     answer = sys.stdin.read(1)
+
                 finally:
                     termios.tcsetattr(fd, termios.TCSADRAIN, oldSettings)
                 return answer
@@ -261,9 +296,7 @@ def format_select(display, entry):
     columns = display.columns
     (h, m, d, t, cr, an, ae, s, b) = entry
 
-    display.add_underline(DisplayPos.SELECT)
-    display.add_underline(DisplayPos.SELECT)
-
+    display.add_select_delimiter()
     strselect = ''
     strselect_l = 'Author:  {} ({})\n'.format(an, ae)
     strselect_l += 'Date:    {} {} ({})\n'.format(d, t, cr)
@@ -309,8 +342,8 @@ def format_select(display, entry):
         ln_r = lst_r[indx]
         lnsp = ln_r.split('|')
         if len(lnsp) > 1 and '>' not in lnsp[1]:
-            lnsp[1] = lnsp[1].replace('+', '{}+{}'.format(GREEN, WHITE))
-            lnsp[1] = lnsp[1].replace('-', '{}-{}'.format(RED, WHITE))
+            lnsp[1] = lnsp[1].replace('+', '{}'.format(display.color_text(PaletteColors.ACTIVE, '+')))
+            lnsp[1] = lnsp[1].replace('-', '{}'.format(display.color_text(PaletteColors.INACTIVE, '-')))
             lst_r[indx] = '|'.join(lnsp)
 
     try:
@@ -342,14 +375,15 @@ def format_select(display, entry):
         display.add_line(DisplayPos.SELECT, strselect)
 
 
-from enum import Enum
 class DisplayPos(Enum):
-    INFO = 1
-    LOG = 2
+    INFO   = 1
+    LOG    = 2
     SELECT = 3
 
 class Display:
-    def __init__(self):
+    def __init__(self, palette):
+        self.palette = palette
+
         result = subprocess.run('stty size', stdout=subprocess.PIPE, shell=True)
         result = result.stdout.decode('utf-8').strip().split()
         self.rows = int(result[0])
@@ -371,30 +405,51 @@ class Display:
             self.screenbuffer_select.append(line)
 
     def add_underline(self, displaypos):
+        underline = self.palette.underline
         if displaypos == DisplayPos.INFO:
-            self.screenbuffer_info.append(UNDERLINE)
+            self.screenbuffer_info.append(underline)
         elif displaypos == DisplayPos.LOG:
-            self.screenbuffer_log.append(UNDERLINE)
+            self.screenbuffer_log.append(underline)
         elif displaypos == DisplayPos.SELECT:
-            self.screenbuffer_select.append(UNDERLINE)
+            self.screenbuffer_select.append(underline)
+
+    def add_select_delimiter(self):
+        underline = self.palette.underline
+        self.screenbuffer_select.append(underline)
+        self.screenbuffer_select.append(underline + '\U00002588' * self.columns)
+
+    def color_text(self, palettecolor, text):
+        return self.palette.d[palettecolor] + text + self.palette.d[PaletteColors.TEXT]
 
     def max_log_lines(self):
         return self.rows - len(self.screenbuffer_info) - len(self.screenbuffer_select)
 
-    def print(self):
+    def draw(self, selected_indx, select_active):
+
+        bg = self.palette.d[PaletteColors.BACKGROUND]
+        fg = self.palette.d[PaletteColors.TEXT]
+        select_bg = self.palette.d[PaletteColors.SELECT_BG] if select_active else self.palette.d[PaletteColors.SELECT_INACTIVE_BG]
+        select_fg = self.palette.d[PaletteColors.SELECT_FG] if select_active else self.palette.d[PaletteColors.SELECT_INACTIVE_FG]
+        reset = self.palette.reset
+
         strbuf = ''
         for ln in self.screenbuffer_info:
-            strbuf += pad(ln, self.columns, '<') + END
-        for ln in self.screenbuffer_log:
-            strbuf += pad(ln, self.columns, '<') + END
+            strbuf += bg + fg + pad(ln, self.columns, '<') + reset
+
+        for indx, ln in enumerate(self.screenbuffer_log):
+            ln = bg + fg + pad(ln, self.columns, '<') + reset
+            if indx == selected_indx:
+                ln = ln.replace(fg, select_fg)
+                ln = ln.replace(bg, select_bg)
+            strbuf += ln
 
         pad_lines = self.rows - len(self.screenbuffer_info) - len(self.screenbuffer_log) - len(self.screenbuffer_select)
         if pad_lines > 0:
             for _ in range(pad_lines):
-                strbuf += '\n'
+                strbuf += '\n' + bg + ' ' * self.columns + reset
 
         for ln in self.screenbuffer_select:
-            strbuf += pad(ln, self.columns, '<') + END
+            strbuf += bg + fg + pad(ln, self.columns, '<') + reset
 
         sys.stdout.writelines(strbuf)
         sys.stdout.flush()
@@ -402,12 +457,15 @@ class Display:
         self.screenbuffer_log = []
         self.screenbuffer_select = []
 
-#import pandas as pd
+
+
 if __name__ == '__main__':
 
-    logging.basicConfig(stream=sys.stderr, level=logging.DEBUG)
+    logging.basicConfig(stream=sys.stderr, level=logging.INFO)
 
-    display = Display()
+    theme = 'themes/dark.txt'
+    palette = Palette(theme)
+    display = Display(palette)
     #for n in range(1, 255):
     #    print('{}: \033[{}mHELLO WORLD!{}'.format(n, n, END))
     #sys.exit()
@@ -420,6 +478,8 @@ if __name__ == '__main__':
     #print("cols: {} rows: {}".format(columns, rows))
     #sys.exit()
 
+    cmd_gituser = 'git config user.name'
+    cmd_gitemail = 'git config user.email'
     result = subprocess.run(cmd_gituser, stdout=subprocess.PIPE, shell=True)
     user_name = result.stdout.decode('utf-8').strip()
 
@@ -439,18 +499,22 @@ if __name__ == '__main__':
     last_xfilter = False
     last_xselect = False
     last_xselect_entry = False
+    xexec = False
+    last_xexec = False
+    str_exec = ''
+    last_str_exec = ''
     lst_matchesx = []
     rows = rows - 2
     ich = 0
-
-
+    exec_hash = ''
+    meta = False
+    str_debug = ''
     total_log_entries = None
     while (True):
-        last_major = (BLUE, 0)
+
         updated = False
         if str_filter != last_str_filter:
             lst_matchesx = []
-            should_print = rows
 
             for major, e in lst_sorted:
                 matchx = get_valid_entry(str_filter, major, e)
@@ -474,24 +538,32 @@ if __name__ == '__main__':
 
         if total_log_entries == None: total_log_entries = len(lst_matchesx) # first time only
 
-        if updated or xfilter != last_xfilter or xselect != last_xselect or xselect_pos != last_xselect_pos or xselect_entry != last_xselect_entry or xselect_diff:
+        if updated or xfilter != last_xfilter or xselect != last_xselect or xselect_pos != last_xselect_pos or xselect_entry != last_xselect_entry or xselect_diff or str_exec != last_str_exec or xexec != last_xexec:
             display.clear()
+            
+            strsearch = display.color_text(PaletteColors.ACTIVE, 'search') if xfilter else display.color_text(PaletteColors.INACTIVE, 'search')
+            strselect = display.color_text(PaletteColors.ACTIVE, 'select') if xselect else display.color_text(PaletteColors.INACTIVE, 'select')
+            strexecute = display.color_text(PaletteColors.ACTIVE, 'execute') if xexec else display.color_text(PaletteColors.INACTIVE, 'execute')
+            str_cmd_filter = '[{}] [{}] [{}] log entries: {}'.format(strselect, strsearch, strexecute, total_log_entries, xselect)
 
-            strsearch = '{}search{}'.format(GREEN, WHITE) if xfilter else '{}search{}'.format(RED, WHITE)
-            strselect = '{}select{}'.format(GREEN, WHITE) if xselect else '{}select{}'.format(RED, WHITE)
-            str_cmd_filter = '[{}] [{}] log entries: {}'.format(strselect, strsearch, total_log_entries, xselect)
-
-            infobar_l = 'jLOG {}'.format(str_cmd_filter)
+            infobar_l = display.color_text(PaletteColors.TEXT_ALT1, 'GIT') + display.color_text(PaletteColors.TEXT_ALT2, 'i') + ' ' + str_cmd_filter
             infobar_r = '{} ({})'.format(user_name, user_email)
             infobar = pad(infobar_l, columns - len(infobar_r), '<') + infobar_r
             display.add_line(DisplayPos.INFO, infobar)
 
             if str_filter or xfilter:
-                searchbar = 'Hits: {:5} | Search string: {}{}{}'.format(len(lst_matchesx), CYAN, str_filter, WHITE)
+                searchbar = 'Hits: {:5} | Search string: {}'.format(len(lst_matchesx), display.color_text(PaletteColors.TEXT_INPUT, str_filter))
                 display.add_line(DisplayPos.INFO, searchbar)
 
-            display.add_underline(DisplayPos.INFO)
+            if xexec:
+                execbar = 'Execute command on commit ({}): {}'.format(exec_hash, str_exec)
+                display.add_line(DisplayPos.INFO, execbar)
 
+            if str_debug:
+                debugbar = 'DEBUG: {}'.format(str_debug)
+                display.add_line(DisplayPos.INFO, debugbar)
+                
+            display.add_underline(DisplayPos.INFO)
 
             if xselect_pos > len(lst_matchesx):
                 xselect_pos = 0
@@ -514,41 +586,88 @@ if __name__ == '__main__':
                 subprocess.call('git show {}'.format(h), shell=True)
                 xselect_diff = False
 
+            major_toggle = False
+            last_major = ''
             for indx, matchx in enumerate(lst_matchesx[current:current + max_log_lines]):
-                strselect = '{}'.format(BG_RED) if xselect_pos == indx else ''
+                (h, m, _, _, _, _, _, _, _) = lst_matchesx[indx]
+                if xselect_pos == indx:
+                    exec_hash = h
 
-                formatted_entry = get_formatted_entry(str_filter, columns - 6, user_name, user_email, matchx)
-                logentry = '{}{:4}: {}'.format(strselect, current+indx, formatted_entry)
+                if m != last_major:
+                    major_toggle = not major_toggle
+                    last_major = m
+                formatted_entry = get_formatted_entry(display, str_filter, columns - 6, user_name, user_email, matchx, major_toggle)
+                logentry = '{:4}: {}'.format(current+indx, formatted_entry)
                 display.add_line(DisplayPos.LOG, logentry)
 
-            display.print()
+            display.draw(xselect_pos, xselect)
             last_xfilter = xfilter
             last_xselect = xselect
             last_xselect_pos = xselect_pos
             last_xselect_entry = xselect_entry
+            last_str_exec = str_exec
+            last_xexec = xexec
 
+
+        meta = False
         ch = getChar()
-        ich += ord(ch[0])
-        #print('input: {} > {}'.format(ch, ich))
+        ich = ord(ch[0])
+
+        #str_debug = 'input: "{}" > {}'.format(ch, ich)
+        #print('input: "{}" > {} e={}'.format(ch, ich, ch.encode()))
 
         if ch == '/' and not xfilter:
             current = 0
             xfilter = True
             continue
 
-        if ich == 127 and xfilter:
-            str_filter = str_filter[:-1]
+        if ich == 27:
+            # esc
+            if xfilter:
+                xfilter = False
+                str_filter = ''
+
+            if xexec:
+                xexec = False
+                str_exec = ''
+
+            if xselect_entry:
+                xselect_entry = False
+
+            continue
+
+        if ich == 127:
+            # backspace
+            if xfilter:
+                str_filter = str_filter[:-1]
+            if xexec:
+                str_exec = str_exec[:-1]
             ich = 0
             continue
 
         if ch == '\n':
-            xfilter = False
-            print('<< filter quit >>  '.format(str_filter), end='\r')
+            if xfilter:
+                xfilter = False
+                print('<< filter quit >>  '.format(str_filter), end='\r')
+
+            if xexec:
+                xexec = False
+                if str_exec:
+                    display.clear()
+                    cmd = '{} {}'.format(str_exec, exec_hash)
+                    print('command executed: {}'.format(cmd))
+                    subprocess.call(cmd, shell=True)
+                    sys.exit()
             continue
 
         if xfilter:
             ich = 0
             str_filter += ch
+            continue
+
+        if xexec:
+            ich = 0
+            str_exec += ch
             continue
 
         if xselect and ch == 'd':
@@ -559,6 +678,9 @@ if __name__ == '__main__':
             xselect = not xselect
             continue
 
+        if ch == 'x' and xselect:
+            xexec = True
+
         if xselect and ch == 'i':
             xselect_entry = not xselect_entry
             continue
@@ -568,7 +690,7 @@ if __name__ == '__main__':
             break
 
         # p or arrow
-        if (ch == 'p' or ich == 183) and not xfilter:
+        if (ich == 112 or ich == 183) and not xfilter:
             if (xselect):
                 xselect_pos -= 1
             else:
@@ -577,22 +699,10 @@ if __name__ == '__main__':
             continue
 
         # n or arrow
-        if (ch == 'n' or ich == 184) and not xfilter:
+        if (ich == 110 or ich == 184) and not xfilter:
             if xselect:
                 xselect_pos += 1
             else:
                 current = min(current + 10, len(lst_matchesx) - rows)
                 ich = 0
-            continue
-
-        # page up
-        if (ich == 297) and not xfilter:
-            current = max(current - 50, 0)
-            ich = 0
-            continue
-
-        # page down
-        if (ich == 298) and not xfilter:
-            current = min(current + 50, len(lst_matchesx) - rows)
-            ich = 0
             continue
