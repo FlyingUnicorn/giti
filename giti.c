@@ -1384,9 +1384,6 @@ giti_window_stack_pop(giti_window_stack_t* gws)
     if (gw->opt.cb_destroy) {
         gw->opt.cb_destroy(gw->opt.cb_arg_destroy);
     }
-    else {
-        log("NO DESTROY FN");
-    }
 
     free(gw);
 
