@@ -1600,6 +1600,6 @@ exit:
     free(user_email);
     free(current_branch);
 
-    giti_exit(0, "");
     log("-- END --");
+    giti_exit(0, "OK");
 }
