@@ -3,10 +3,12 @@
 
 #include <assert.h>
 #include <ctype.h>
-#include <curses.h>
+#include <locale.h>
+#include <ncurses.h>
 #include <stddef.h>
 #include <stdlib.h>
 #include <string.h>
+#include <wchar.h>
 
 #include "dlist.h"
 
@@ -21,6 +23,7 @@
 #define S_SZ  256
 
 #define log(format, ...) fprintf(stderr, format, ##__VA_ARGS__); fprintf(stderr, "\n")
+#define array_size(a) (sizeof a) / (sizeof (a)[0])
 
 typedef char giti_strbuf_t[256];
 typedef char giti_strbuf_info_t[4096];
@@ -220,64 +223,68 @@ giti_print(WINDOW* w, dlist_t* color_filter, int y, int x, int xmax, const char*
     int filter_x_clr = 0;
     // https://www.unix.com/attachments/programming/6051d1418489361-ncurses-colors-selection_128png
 
-    for (const char* ch = str; i < xmax; ++i) {
+    wchar_t wstr[256];
+    mbstowcs(wstr, str, array_size(wstr));
+
+    for (const wchar_t* ch = wstr; i < xmax; ++i) {
 
         int fg = 0;
-        char print_ch = '\0';
+        wchar_t print_ch = L'\0';
         if (*ch) {
 
-            if (strncmp(ch, "<giti-clr-1>", strlen("<giti-clr-1>")) == 0) {
+            if (wcsncmp(ch, L"<giti-clr-1>", wcslen(L"<giti-clr-1>")) == 0) {
                 filter_clr = 1;
-                ch += strlen("<giti-clr-1>");
+                ch += wcslen(L"<giti-clr-1>");
                 --i;
                 continue;
             }
-            if (strncmp(ch, "<giti-clr-2>", strlen("<giti-clr-2>")) == 0) {
+            if (wcsncmp(ch, L"<giti-clr-2>", wcslen(L"<giti-clr-2>")) == 0) {
                 filter_clr = 2;
-                ch += strlen("<giti-clr-2>");
+                ch += wcslen(L"<giti-clr-2>");
                 --i;
                 continue;
             }
-            if (strncmp(ch, "<giti-clr-3>", strlen("<giti-clr-3>")) == 0) {
+            if (wcsncmp(ch, L"<giti-clr-3>", wcslen(L"<giti-clr-3>")) == 0) {
                 filter_clr = 3;
-                ch += strlen("<giti-clr-3>");
+                ch += wcslen(L"<giti-clr-3>");
                 --i;
                 continue;
             }
-            if (strncmp(ch, "<giti-clr-on>", strlen("<giti-clr-on>")) == 0) {
+            if (wcsncmp(ch, L"<giti-clr-on>", wcslen(L"<giti-clr-on>")) == 0) {
                 filter_clr = 4;
-                ch += strlen("<giti-clr-on>");
+                ch += wcslen(L"<giti-clr-on>");
                 --i;
                 continue;
             }
-            if (strncmp(ch, "<giti-clr-off>", strlen("<giti-clr-off>")) == 0) {
+            if (wcsncmp(ch, L"<giti-clr-off>", wcslen(L"<giti-clr-off>")) == 0) {
                 filter_clr = 5;
-                ch += strlen("<giti-clr-off>");
+                ch += wcslen(L"<giti-clr-off>");
                 --i;
                 continue;
             }
 
-            else if (strncmp(ch, "<giti-clr-end>", strlen("<giti-clr-end>")) == 0) {
+            else if (wcsncmp(ch, L"<giti-clr-end>", wcslen(L"<giti-clr-end>")) == 0) {
                 filter_clr = 0;
-                ch += strlen("<giti-clr-end>");
+                ch += wcslen(L"<giti-clr-end>");
                 --i;
                 continue;
             }
-
+#if 0
             if (color_filter && filter_x_len == 0 && top_window) {
                 for (int i = 0; i < dlist_size(color_filter); ++i) {
                     color_filter_t* f = dlist_get(color_filter, i);
 
-                    if (strncasecmp(ch, f->str, strlen(f->str)) == 0) {
+                    if (strncasecmp(ch, f->str, wcslen(f->str)) == 0) {
                         /* match */
-                        filter_x_len = strlen(f->str);
+                        filter_x_len = wcslen(f->str);
                         filter_x_clr = f->code;
 
                         break;
                     }
                 }
             }
-
+#endif
+            
             if (!top_window) {
                 fg = 6; /* inactive */
             }
@@ -298,7 +305,9 @@ giti_print(WINDOW* w, dlist_t* color_filter, int y, int x, int xmax, const char*
         }
 
         wattron(w, giti_color_scheme(fg, selected));
-        mvwaddch(w, y, x + i, print_ch);
+        //mvwaddch(w, y, x + i, print_ch);
+        mvwaddnwstr(w, y, x + i, &print_ch, 1);
+
         //wattroff(w, COLOR_PAIR(fg + bg));
 
         if (*ch) {
@@ -603,7 +612,7 @@ typedef struct giti_commit {
             char ae[AE_SZ + 1];
             char s[S_SZ + 1];
         };
-        char raw[H_SZ + CI_SZ + CR_SZ + AN_SZ + AE_SZ + S_SZ + 7];
+        char raw[H_SZ + CI_SZ + CR_SZ + AN_SZ + AE_SZ + S_SZ + 7 + 50]; /* 50 for multi-char chars */
     };
     char* b;
     char* files;
@@ -771,7 +780,7 @@ giti_commit_action(void* c_, uint32_t action_id, giti_window_opt_t* opt)
         opt->cb_shortcut = giti_commit_shortcut;
         opt->cb_destroy = giti_window_menu_destroy;
         opt->cb_arg = c;
-        opt->cb_arg_destroy = c;
+        opt->cb_arg_destroy = gwm;
         opt->xmax = -1;
 
         giti_menu_item_t* item = NULL;
@@ -843,7 +852,7 @@ giti_log_entries_(const char* user_email, const char* precmd, const char* postcm
 {
     FILE *fp;
     char cmd[512];
-    snprintf(cmd, sizeof(cmd), "git log %s --pretty=format:\"%%<(%d,trunc)%%h|%%<(%d,trunc)%%ci|%%<(%d,trunc)%%cr|%%<(%d,trunc)%%an|%%<(%d,trunc)%%ae|%%<(%d,trunc)%%s\" %s", precmd ? precmd : "", H_SZ, CI_SZ, CR_SZ, AN_SZ, AE_SZ, S_SZ, postcmd ? postcmd : "");
+    snprintf(cmd, sizeof(cmd), "git log %s --pretty=format:\"%%<(%d,trunc)%%h %%<(%d,trunc)%%ci %%<(%d,trunc)%%cr %%<(%d,trunc)%%an %%<(%d,trunc)%%ae %%<(%d,trunc)%%s\" %s", precmd ? precmd : "", H_SZ, CI_SZ, CR_SZ, AN_SZ, AE_SZ, S_SZ, postcmd ? postcmd : "");
 
     fp = popen(cmd, "r");
     if (fp == NULL) {
@@ -867,6 +876,13 @@ giti_log_entries_(const char* user_email, const char* precmd, const char* postcm
         strtrim(e->an);
         strtrim(e->ae);
         strtrim(e->s);
+
+        log("e->h:  %s", e->h);
+        log("e->ci: %s", e->ci);
+        log("e->ch: %s", e->cr);
+        log("e->an: %s", e->an);
+        log("e->ae: %s", e->ae);
+        log("e->s:  %s", e->s);
 
         if (strncmp(user_email, e->ae, strlen(user_email)) == 0) {
             e->is_self = true;
@@ -1486,6 +1502,8 @@ giti_window_stack_display(giti_window_stack_t* gws)
 int
 main()
 {
+    setlocale(LC_CTYPE, "");
+    //setlocale(LC_ALL, "");
     log("-- START --");
 
     char* user_name = giti_user_name();
