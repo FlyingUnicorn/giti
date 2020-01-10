@@ -64,7 +64,7 @@ typedef struct giti_window_opt {
     giti_window_title_cb_t   cb_title;
     giti_window_filter_cb_t  cb_filter;
     giti_window_destroy_cb_t cb_destroy;
-    bool (*cb_shortcut)(void* arg, char ch, uint32_t action_id, struct giti_window_opt* opt);
+    bool (*cb_shortcut)(void* arg, wint_t wch, uint32_t action_id, struct giti_window_opt* opt);
 } giti_window_opt_t;
 
 typedef struct giti_window {
@@ -744,7 +744,7 @@ giti_window_menu_destroy(void* gwm_)
 }
 
 static bool
-giti_commit_shortcut(void* c_, char ch, uint32_t action_id, giti_window_opt_t* opt);
+giti_commit_shortcut(void* c_, wint_t wch, uint32_t action_id, giti_window_opt_t* opt);
 
 static bool
 giti_commit_action(void* c_, uint32_t action_id, giti_window_opt_t* opt)
@@ -818,13 +818,12 @@ giti_commit_action(void* c_, uint32_t action_id, giti_window_opt_t* opt)
 }
 
 static bool
-giti_commit_shortcut(void* c_, char ch, uint32_t action_id, giti_window_opt_t* opt)
+giti_commit_shortcut(void* c_, wint_t wch, uint32_t action_id, giti_window_opt_t* opt)
 {
-    log(__func__);
     giti_commit_t* c = c_;
 
     bool claimed = false;
-    if (ch == '\n') {
+    if (wch == '\n') {
         claimed = giti_commit_action(c, action_id, opt);
     }
 
@@ -877,12 +876,12 @@ giti_log_entries_(const char* user_email, const char* precmd, const char* postcm
         strtrim(e->ae);
         strtrim(e->s);
 
-        log("e->h:  %s", e->h);
-        log("e->ci: %s", e->ci);
-        log("e->ch: %s", e->cr);
-        log("e->an: %s", e->an);
-        log("e->ae: %s", e->ae);
-        log("e->s:  %s", e->s);
+        //log("e->h:  %s", e->h);
+        //log("e->ci: %s", e->ci);
+        //log("e->ch: %s", e->cr);
+        //log("e->an: %s", e->an);
+        //log("e->ae: %s", e->ae);
+        //log("e->s:  %s", e->s);
 
         if (strncmp(user_email, e->ae, strlen(user_email)) == 0) {
             e->is_self = true;
@@ -943,26 +942,26 @@ giti_log_filter(giti_log_t* gl)
 }
 
 static bool
-giti_log_shortcut(void* gl_, char ch, uint32_t action_id, giti_window_opt_t* opt)
+giti_log_shortcut(void* gl_, wint_t wch, uint32_t action_id, giti_window_opt_t* opt)
 {
     giti_log_t* gl = gl_;
 
     bool claimed = true;
     if (gl->filter.active) {
-        if (ch == '\n') {
+        if (wch == '\n') {
             gl->filter.active = false;
         }
-        else if (ch == 7) { /* backspace */
+        else if (wch == KEY_BACKSPACE || wch == 127 || wch == '\b') { /* backspace */
             if (gl->filter.str_pos) {
                 gl->filter.str[--gl->filter.str_pos] = '\0';
             }
         }
-        else if (isprint(ch) && gl->filter.str_pos < sizeof(gl->filter.str) - 1) {
-            gl->filter.str[gl->filter.str_pos++] = ch;
+        else if (isprint(wch) && gl->filter.str_pos < sizeof(gl->filter.str) - 1) {
+            gl->filter.str[gl->filter.str_pos++] = wch;
         }
     }
     else {
-        switch (ch) {
+        switch (wch) {
         case 'm':
             gl->filter.self = !gl->filter.self;
             break;
@@ -1112,7 +1111,7 @@ static char*
 giti_branch_commit_row(giti_strbuf_t strbuf, void* e_)
 {
     giti_commit_t* e = e_;
-    snprintf(strbuf, sizeof(giti_strbuf_t), "  %s <giti-clr-2>%s<giti-clr-end> <giti-clr-3>%s<giti-clr-end> <giti-clr-1>%-20s<giti-clr-end> %s", e->h, e->ci_date, e->ci_time, e->an, e->s);
+    snprintf(strbuf, sizeof(giti_strbuf_t), "  %s <giti-clr-2>%s<giti-clr-end> <giti-clr-3>%s<giti-clr-end> <giti-clr-1>%-30s<giti-clr-end> %s", e->h, e->ci_date, e->ci_time, e->an, e->s);
 
     return strbuf;
 }
@@ -1158,7 +1157,7 @@ giti_branch(const char* current_branch, const char* user_email)
 
     for (int i = 0; i < dlist_size(branches); ++i) {
         giti_branch_t* b = dlist_get(branches, i);
-        log("branch name: %s upstream: %s", b->name, b->upstream);
+        //log("branch name: %s upstream: %s", b->name, b->upstream);
 
         if (strlen(b->upstream) != 0) {
             char precmd[1024];
@@ -1178,7 +1177,7 @@ giti_branch_menu_title_str(void* e_, giti_strbuf_t strbuf)
 }
 
 static bool
-giti_branch_shortcut(void* b_, char ch, uint32_t action_id, giti_window_opt_t* opt);
+giti_branch_shortcut(void* b_, wint_t wch, uint32_t action_id, giti_window_opt_t* opt);
 
 static bool
 giti_branch_action(void* b_, uint32_t action_id, giti_window_opt_t* opt)
@@ -1189,7 +1188,7 @@ giti_branch_action(void* b_, uint32_t action_id, giti_window_opt_t* opt)
 
     switch (action_id) {
     case 'l': {
-        log("log %s", b->name);
+        //log("log %s", b->name);
         *opt = giti_log_create(b->name, b->user_email);
         break;
     }
@@ -1251,14 +1250,14 @@ giti_branch_action(void* b_, uint32_t action_id, giti_window_opt_t* opt)
 }
 
 static bool
-giti_branch_shortcut(void* b_, char ch, uint32_t action_id, giti_window_opt_t* opt)
+giti_branch_shortcut(void* b_, wint_t wch, uint32_t action_id, giti_window_opt_t* opt)
 {
     /* this could be a general function */
     giti_branch_t* b = b_;
 
     bool claimed = false;
 
-    if (ch == '\n') {
+    if (wch == '\n') {
         claimed = giti_branch_action(b, action_id, opt);
     }
 
@@ -1273,7 +1272,7 @@ typedef struct giti_branches {
 } giti_branches_t;
 
 static bool
-giti_branches_shortcut(void* gb_, char ch, uint32_t action_id, giti_window_opt_t* opt)
+giti_branches_shortcut(void* gb_, wint_t wch, uint32_t action_id, giti_window_opt_t* opt)
 {
     // giti_log_t* gb = gb_;
     return false;
@@ -1502,8 +1501,8 @@ giti_window_stack_display(giti_window_stack_t* gws)
 int
 main()
 {
-    setlocale(LC_CTYPE, "");
-    //setlocale(LC_ALL, "");
+    //setlocale(LC_CTYPE, "");
+    setlocale(LC_ALL, "");
     log("-- START --");
 
     char* user_name = giti_user_name();
@@ -1547,10 +1546,12 @@ main()
 
     giti_color_scheme_init(&cs);
 
-    int ch;
-    while((ch = wgetch(giti_window_stack_get(gws, GITI_WINDOW_STACK_BOTTOM)->w))) {
-
-        //log("ch %c ich: %d", ch, ch);
+    //int ch;
+    //while((ch = wgetch(giti_window_stack_get(gws, GITI_WINDOW_STACK_BOTTOM)->w))) {
+    wint_t ch;
+    while (true) {
+        char sch = wget_wch(giti_window_stack_get(gws, GITI_WINDOW_STACK_BOTTOM)->w, &ch);
+        //log("sch: %c sich: %d || wch: %d (%d %d)\n", sch, sch, ch, KEY_BACKSPACE, '\b');
 
         giti_window_t* tw = giti_window_stack_get(gws, GITI_WINDOW_STACK_TOP);
         bool claimed = false;
