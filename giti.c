@@ -1095,14 +1095,14 @@ giti_log_destroy(void* gl_)
 }
 
 static giti_window_opt_t
-giti_log_create(const char* branch, const char* user_email)
+giti_log_create(const char* branch, const char* user_email, size_t entries)
 {
     giti_log_t* gl = calloc(1, sizeof *gl);
 
     strncpy(gl->branch, branch, sizeof(gl->branch));
     strncpy(gl->user_email, user_email, sizeof(gl->user_email));
 
-    gl->entries = giti_log_entries(branch, user_email, 20000);
+    gl->entries = giti_log_entries(branch, user_email, entries);
 
     giti_log_filter(gl);
 
@@ -1233,7 +1233,7 @@ giti_branch_action(void* b_, uint32_t action_id, giti_window_opt_t* opt)
     switch (action_id) {
     case 'l': {
         //log("log %s", b->name);
-        *opt = giti_log_create(b->name, b->user_email);
+        *opt = giti_log_create(b->name, b->user_email, 10000);
         break;
     }
     case '\n': {
@@ -1590,12 +1590,10 @@ main()
 
     giti_color_scheme_init(&cs);
 
-    //int ch;
-    //while((ch = wgetch(giti_window_stack_get(gws, GITI_WINDOW_STACK_BOTTOM)->w))) {
     wint_t ch;
     while (true) {
         wget_wch(giti_window_stack_get(gws, GITI_WINDOW_STACK_BOTTOM)->w, &ch);
-        //log("sch: %c sich: %d || wch: %d (%d %d)\n", sch, sch, ch, KEY_BACKSPACE, '\b');
+        // log("wch: %d (%d)\n", ch, KEY_NPAGE);
 
         giti_window_t* tw = giti_window_stack_get(gws, GITI_WINDOW_STACK_TOP);
         bool claimed = false;
@@ -1636,8 +1634,16 @@ main()
             case 'n':
                 tw->pos = MIN(giti_window_posmax(tw), tw->pos + 1);
                 break;
+            case KEY_PPAGE:
+            case 240:
+                tw->pos = MAX(0, tw->pos - 15);
+                break;
+            case KEY_NPAGE:
+            case 238:
+                tw->pos = MIN(giti_window_posmax(tw), tw->pos + 15);
+                break;
             case 'l': {
-                giti_window_opt_t opt = giti_log_create(current_branch, user_email);
+                giti_window_opt_t opt = giti_log_create(current_branch, user_email, 10000);
                 giti_window_stack_push(gws, opt);
                 break;
             }
