@@ -1,8 +1,14 @@
 
 #include "dlist.h"
 
+#include <stddef.h>
 #include <stdlib.h>
 #include <stdio.h>
+
+// https://radek.io/2012/11/10/magical-container_of-macro/
+#define container_of(ptr, type, member) ({                      \
+        const typeof( ((type *)0)->member ) *__mptr = (ptr);    \
+        (type *)( (char *)__mptr - offsetof(type,member) );})
 
 typedef struct dlist_entry {
     struct dlist_entry* prev;
@@ -100,4 +106,36 @@ dlist_get(const dlist_t* dl, size_t indx)
         e = e->next;
     }
     return e->data;
+}
+
+
+struct dlist_iterator {
+    dlist_entry_t* head;
+    dlist_entry_t* last;
+};
+
+dlist_iterator_t*
+dlist_iterator_create(const dlist_t* dl)
+{
+    dlist_iterator_t* it = malloc(sizeof *it);
+    it->head = dl->head;
+    it->last = NULL;
+
+    return it;
+}
+
+void*
+dlist_iterator_next(dlist_iterator_t* it)
+{
+    void* data = NULL;
+    if (it->last == NULL) {
+        it->last = it->head;
+        data = it->last->data;
+    }
+    else if (it->last->next != it->head) {
+        it->last = it->last->next;
+        data = it->last->data;
+    }
+
+    return data;
 }

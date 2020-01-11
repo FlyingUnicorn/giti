@@ -955,8 +955,12 @@ giti_log_filter(giti_log_t* gl)
     gl->filtered_entries = dlist_create();
 
     gl->filter.found = 0;
-    for (int i = 0; i < dlist_size(gl->entries); ++i) {
-        giti_commit_t* e = dlist_get(gl->entries, i);
+    //for (int i = 0; i < dlist_size(gl->entries); ++i) {
+    //    giti_commit_t* e = dlist_get(gl->entries, i);
+
+    giti_commit_t* e = NULL;
+    dlist_iterator_t* it = dlist_iterator_create(gl->entries);
+    while ((e = dlist_iterator_next(it))) {
 
         wchar_t wstr[256];
         swprintf(wstr, array_size(wstr), L"%s %s %s %s %s", e->h, e->ci_date, e->an, e->ae, e->s);
@@ -1098,7 +1102,7 @@ giti_log_create(const char* branch, const char* user_email)
     strncpy(gl->branch, branch, sizeof(gl->branch));
     strncpy(gl->user_email, user_email, sizeof(gl->user_email));
 
-    gl->entries = giti_log_entries(branch, user_email, 100);
+    gl->entries = giti_log_entries(branch, user_email, 20000);
 
     giti_log_filter(gl);
 
