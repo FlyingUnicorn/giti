@@ -15,6 +15,9 @@ void
 dlist_foreach(const dlist_t* dl, void (*dlist_foreach_fn)(void* data, void* arg), void* arg);
 
 void
+dlist_clear(dlist_t* dl, void (*dlist_free_fn)(void* data));
+
+void
 dlist_destroy(dlist_t* dl, void (*dlist_free_fn)(void* data));
 
 size_t
@@ -32,5 +35,8 @@ dlist_iterator_create(const dlist_t* dl);
 
 void*
 dlist_iterator_next(dlist_iterator_t* it);
+
+void
+dlist_iterator_destroy(dlist_iterator_t* it);
 
 #endif

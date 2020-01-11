@@ -43,7 +43,6 @@ dlist_create(void)
 void
 dlist_append(dlist_t* dl, void* data)
 {
-    //printf("[%s]\n", __func__);
     dlist_entry_t* e = dlist_entry_create(data);
     if (dl->size) {
         e->prev = dl->head->prev;
@@ -59,6 +58,25 @@ dlist_append(dlist_t* dl, void* data)
     ++dl->size;
 }
 
+static void*
+dlist_pop(dlist_t* dl)
+{
+    if (!dl->size) {
+        return NULL;
+    }
+
+    dlist_entry_t* e = dl->head->prev;
+    void* data = e->data;
+
+    e->prev->next = e->next;
+    e->next->prev = e->prev;
+
+    free(e);
+
+   --dl->size;
+   return data;
+}
+
 void
 dlist_foreach(const dlist_t* dl, void (*dlist_foreach_fn)(void* data, void* arg), void* arg)
 {
@@ -66,25 +84,24 @@ dlist_foreach(const dlist_t* dl, void (*dlist_foreach_fn)(void* data, void* arg)
     for (int i = 0; i < dl->size; ++i) {
         dlist_foreach_fn(e->data, arg);
         e = e->next;
+    }
+}
 
-        //if (e->next == dl->head) {
-        //    break;
-        //}
+void
+dlist_clear(dlist_t* dl, void (*dlist_free_fn)(void* data))
+{
+    void* data;
+    while((data = dlist_pop(dl))) {
+        if (dlist_free_fn) {
+            dlist_free_fn(data);
+        }
     }
 }
 
 void
 dlist_destroy(dlist_t* dl, void (*dlist_free_fn)(void* data))
 {
-    //dlist_entry_t* e = dl->head;
-    //while(e != NULL) {
-    // dlist_free_fn(e->data);
-        //dlist_entry_t* e_ = e;
-
-    //  e->
-        
-    //  free(e_);
-    //}
+    dlist_clear(dl, dlist_free_fn);
     free(dl);
 }
 
@@ -138,4 +155,10 @@ dlist_iterator_next(dlist_iterator_t* it)
     }
 
     return data;
+}
+
+void
+dlist_iterator_destroy(dlist_iterator_t* it)
+{
+    free(it);
 }

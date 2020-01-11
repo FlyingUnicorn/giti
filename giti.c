@@ -950,19 +950,18 @@ static void
 giti_log_filter(giti_log_t* gl)
 {
     if (gl->filtered_entries) {
-        dlist_destroy(gl->filtered_entries, free);
+        dlist_clear(gl->filtered_entries, free);
     }
-    gl->filtered_entries = dlist_create();
-
+    else {
+        gl->filtered_entries = dlist_create();
+    }
     gl->filter.found = 0;
-    //for (int i = 0; i < dlist_size(gl->entries); ++i) {
-    //    giti_commit_t* e = dlist_get(gl->entries, i);
 
     giti_commit_t* e = NULL;
     dlist_iterator_t* it = dlist_iterator_create(gl->entries);
     while ((e = dlist_iterator_next(it))) {
 
-        wchar_t wstr[256];
+        wchar_t wstr[256] = { 0 };
         swprintf(wstr, array_size(wstr), L"%s %s %s %s %s", e->h, e->ci_date, e->an, e->ae, e->s);
 
         const wchar_t* str = gl->filter.str_pos ? gl->filter.str : NULL;
@@ -983,6 +982,7 @@ giti_log_filter(giti_log_t* gl)
             dlist_append(gl->filtered_entries, item);
         }
     }
+    dlist_iterator_destroy(it);
 }
 
 static bool
@@ -1443,6 +1443,7 @@ giti_window_stack_pop(giti_window_stack_t* gws)
     if (gw->opt.cb_destroy) {
         gw->opt.cb_destroy(gw->opt.cb_arg_destroy);
     }
+    gws->stack[gws->stack_pos] = NULL;
 
     free(gw);
 
@@ -1528,6 +1529,7 @@ giti_window_stack_display(giti_window_stack_t* gws)
 
         if (color_filter) {
             dlist_destroy(color_filter, free);
+            color_filter = NULL;
         }
     }
 }
@@ -1635,11 +1637,9 @@ main()
                 tw->pos = MIN(giti_window_posmax(tw), tw->pos + 1);
                 break;
             case KEY_PPAGE:
-            case 240:
                 tw->pos = MAX(0, tw->pos - 15);
                 break;
             case KEY_NPAGE:
-            case 238:
                 tw->pos = MIN(giti_window_posmax(tw), tw->pos + 15);
                 break;
             case 'l': {
