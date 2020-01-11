@@ -91,7 +91,7 @@ dlist_size(const dlist_t* dl)
 void*
 dlist_get(const dlist_t* dl, size_t indx)
 {
-    if (indx > dl->size) {
+    if (indx >= dl->size) {
         return NULL;
     }
 

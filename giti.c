@@ -9,6 +9,7 @@
 #include <stdlib.h>
 #include <string.h>
 #include <wchar.h>
+#include <wctype.h>
 
 #include "dlist.h"
 
@@ -114,6 +115,43 @@ strlines(const char* str)
     return lines;
 }
 
+static bool
+strwcmp(const wchar_t* needle, const wchar_t* haystack)
+{
+    if (needle == NULL || haystack == NULL || wcslen(needle) > wcslen(haystack)) {
+        return false;
+    }
+
+    for (; *haystack ; ++haystack) {
+        bool match = true;
+        for (const wchar_t* h = haystack, *n = needle; *n; ++n, ++h) {
+            if (towlower(*n) != towlower(*h)) {
+                match = false;
+                break;
+            }
+        }
+        if (match) {
+            return true;
+        }
+    }
+    return false;
+}
+
+static int
+strwcasecmp(const wchar_t* str1, const wchar_t* str2, size_t n)
+{
+    if (!str1 || !str2) {
+        return -1;
+    }
+
+    for (int i = 0; *str1 && *str2 && i < n; ++str1, ++str2, ++n) {
+        if (towlower(*str1) != towlower(*str2)) {
+            return -1;
+        }
+    }
+    return 0;
+}
+
 static size_t
 strlen_formatted(const char* str)
 {
@@ -210,8 +248,8 @@ giti_color_scheme(int clr, bool selected)
 }
 
 typedef struct color_filter{
-    giti_strbuf_t str;
-    uint8_t       code;
+    wchar_t str[256];
+    uint8_t code;
 } color_filter_t;
 
 static void
@@ -269,12 +307,13 @@ giti_print(WINDOW* w, dlist_t* color_filter, int y, int x, int xmax, const char*
                 --i;
                 continue;
             }
-#if 0
+
             if (color_filter && filter_x_len == 0 && top_window) {
                 for (int i = 0; i < dlist_size(color_filter); ++i) {
                     color_filter_t* f = dlist_get(color_filter, i);
 
-                    if (strncasecmp(ch, f->str, wcslen(f->str)) == 0) {
+                    //log("needle: %ls haystack: %ls", f->str, ch);
+                    if (strwcasecmp(ch, f->str, wcslen(f->str)) == 0) {
                         /* match */
                         filter_x_len = wcslen(f->str);
                         filter_x_clr = f->code;
@@ -283,8 +322,7 @@ giti_print(WINDOW* w, dlist_t* color_filter, int y, int x, int xmax, const char*
                     }
                 }
             }
-#endif
-            
+
             if (!top_window) {
                 fg = 6; /* inactive */
             }
@@ -710,12 +748,12 @@ giti_commit_files_color_filter(void* c_)
     color_filter_t* f = NULL;
 
     f = malloc(sizeof *f);
-    strncpy(f->str, "+", sizeof(f->str));
+    wcsncpy(f->str, L"+", sizeof(f->str));
     f->code = 4;
     dlist_append(color_filter, f);
 
     f = malloc(sizeof *f);
-    strncpy(f->str, "-", sizeof(f->str));
+    wcsncpy(f->str, L"-", sizeof(f->str));
     f->code = 5;
     dlist_append(color_filter, f);
 
@@ -838,7 +876,7 @@ typedef struct giti_log {
     dlist_t*      filtered_entries;
     struct {
         bool      self;
-        char      str[256];
+        wchar_t   str[256];
         size_t    str_pos;
         bool      active;
         bool      show_all;
@@ -868,6 +906,7 @@ giti_log_entries_(const char* user_email, const char* precmd, const char* postcm
         e->an[AN_SZ]   = '\0';
         e->ae[AE_SZ]   = '\0';
         e->s[S_SZ]     = '\0';
+        e->b           = NULL;
 
         strtrim(e->h);
         strtrim(e->ci);
@@ -915,15 +954,16 @@ giti_log_filter(giti_log_t* gl)
     }
     gl->filtered_entries = dlist_create();
 
-    char* str = gl->filter.str_pos ? gl->filter.str : NULL;
     gl->filter.found = 0;
     for (int i = 0; i < dlist_size(gl->entries); ++i) {
         giti_commit_t* e = dlist_get(gl->entries, i);
 
+        wchar_t wstr[256];
+        swprintf(wstr, array_size(wstr), L"%s %s %s %s %s", e->h, e->ci_date, e->an, e->ae, e->s);
+
+        const wchar_t* str = gl->filter.str_pos ? gl->filter.str : NULL;
         bool match = (!gl->filter.self || (gl->filter.self && strstr(gl->user_email, e->ae))) &&
-            (!str || (str && (strcasestr(e->h, str) || strcasestr(e->ci_date, str) ||
-                              strcasestr(e->an, str) || strcasestr(e->ae, str) ||
-                              strcasestr(e->s, str))));
+            (!str || (str && strwcmp(str, wstr)));
 
         if (match) {
             ++gl->filter.found;
@@ -953,10 +993,10 @@ giti_log_shortcut(void* gl_, wint_t wch, uint32_t action_id, giti_window_opt_t* 
         }
         else if (wch == KEY_BACKSPACE || wch == 127 || wch == '\b') { /* backspace */
             if (gl->filter.str_pos) {
-                gl->filter.str[--gl->filter.str_pos] = '\0';
+                gl->filter.str[--gl->filter.str_pos] = L'\0';
             }
         }
-        else if (isprint(wch) && gl->filter.str_pos < sizeof(gl->filter.str) - 1) {
+        else if (iswprint(wch) && gl->filter.str_pos < sizeof(gl->filter.str) - 1) {
             gl->filter.str[gl->filter.str_pos++] = wch;
         }
     }
@@ -1009,7 +1049,7 @@ giti_log_color_filter(void* gl_)
         color_filter = dlist_create();
 
         color_filter_t* f = malloc(sizeof *f);
-        strncpy(f->str, gl->filter.str, sizeof(f->str));
+        wcsncpy(f->str, gl->filter.str, array_size(f->str));
         f->code = 5;
         dlist_append(color_filter, f);
     }
@@ -1031,10 +1071,10 @@ giti_log_title_str(void* gl_, giti_strbuf_t strbuf)
     }
 
     if (gl->filter.active) {
-        pos += snprintf(strbuf + pos, sizeof(giti_strbuf_t) - pos, " %s[<giti-clr-on>ON<giti-clr-end>] %s", gl->filter.show_all ? "highlight" : "filter", gl->filter.str);
+        pos += snprintf(strbuf + pos, sizeof(giti_strbuf_t) - pos, " %s[<giti-clr-on>ON<giti-clr-end>] %ls", gl->filter.show_all ? "highlight" : "filter", gl->filter.str);
     }
     else if (gl->filter.str_pos) {
-        pos += snprintf(strbuf + pos, sizeof(giti_strbuf_t) - pos, " %s[<giti-clr-off>OFF<giti-clr-end>] %s", gl->filter.show_all ? "highlight" : "filter", gl->filter.str);
+        pos += snprintf(strbuf + pos, sizeof(giti_strbuf_t) - pos, " %s[<giti-clr-off>OFF<giti-clr-end>] %ls", gl->filter.show_all ? "highlight" : "filter", gl->filter.str);
     }
 
     return strbuf;
@@ -1550,7 +1590,7 @@ main()
     //while((ch = wgetch(giti_window_stack_get(gws, GITI_WINDOW_STACK_BOTTOM)->w))) {
     wint_t ch;
     while (true) {
-        char sch = wget_wch(giti_window_stack_get(gws, GITI_WINDOW_STACK_BOTTOM)->w, &ch);
+        wget_wch(giti_window_stack_get(gws, GITI_WINDOW_STACK_BOTTOM)->w, &ch);
         //log("sch: %c sich: %d || wch: %d (%d %d)\n", sch, sch, ch, KEY_BACKSPACE, '\b');
 
         giti_window_t* tw = giti_window_stack_get(gws, GITI_WINDOW_STACK_TOP);
