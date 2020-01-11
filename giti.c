@@ -1,4 +1,5 @@
 
+
 #define _GNU_SOURCE
 
 #include <assert.h>
@@ -357,8 +358,9 @@ giti_print(WINDOW* w, dlist_t* color_filter, int y, int x, int xmax, const char*
 static void
 giti_exit(int code, const char* msg)
 {
-    erase();
     bkgd(0);
+    erase();
+    refresh();
     endwin();
     printf("GITi exit:\n%s\n", msg);
     exit(code);
@@ -550,6 +552,96 @@ giti_user_email()
     pclose(fp);
 
     return strtrim(res);
+}
+
+typedef struct giti_file_status {
+    char          staged_status;
+    char          unstaged_status;
+    giti_strbuf_t str;
+    struct {
+        uint32_t add;
+        uint32_t del;
+    } staged;
+    struct {
+        uint32_t add;
+        uint32_t del;
+    } unstaged;
+} giti_file_status_t;
+
+static void
+giti_status_(dlist_t* dlist)
+{
+    FILE *fp;
+    giti_strbuf_t strbuf;
+
+    const char* cmd = "git status --porcelain=v1";
+    fp = popen(cmd, "r");
+    if (fp == NULL) {
+        printf("Failed to run command\n" );
+        exit(1);
+    }
+
+    while (fgets(strbuf, sizeof strbuf, fp) != NULL) {
+        giti_file_status_t* gfs = malloc(sizeof *gfs);
+        gfs->staged_status = strbuf[0];
+        gfs->unstaged_status = strbuf[1];
+        strncpy(gfs->str, strtrim(strbuf + 3), sizeof gfs->str);
+        dlist_append(dlist, gfs);
+    }
+    pclose(fp);
+}
+
+static void
+giti_status_changes(giti_file_status_t* gfs)
+{
+    FILE *fp;
+
+    giti_strbuf_t cmd;
+    snprintf(cmd, sizeof cmd, "git diff --numstat --cached -- %s", gfs->str);
+    fp = popen(cmd, "r");
+    if (fp == NULL) {
+        printf("Failed to run command\n" );
+        exit(1);
+    }
+
+    char* end;
+    giti_strbuf_t strbuf;
+    while (fgets(strbuf, sizeof strbuf, fp) != NULL) {
+        log(strbuf);
+        gfs->staged.add = strtoul(strbuf, &end, 10);
+        gfs->staged.del = strtoul(end, &end, 10);
+    }
+    pclose(fp);
+
+    snprintf(cmd, sizeof cmd, "git diff --numstat -- %s", gfs->str);
+    fp = popen(cmd, "r");
+    if (fp == NULL) {
+        printf("Failed to run command\n" );
+        exit(1);
+    }
+
+    while (fgets(strbuf, sizeof strbuf, fp) != NULL) {
+        log(strbuf);
+        gfs->unstaged.add = strtoul(strbuf, &end, 10);
+        gfs->unstaged.del = strtoul(end, &end, 10);
+    }
+    pclose(fp);
+
+}
+
+static void
+giti_status(dlist_t* dlist)
+{
+    giti_status_(dlist);
+
+    dlist_iterator_t* it = dlist_iterator_create(dlist);
+
+    giti_file_status_t* gfs;
+    while ((gfs = dlist_iterator_next(it))) {
+        giti_status_changes(gfs);
+
+    }
+    dlist_iterator_destroy(it);
 }
 
 static char*
@@ -811,7 +903,7 @@ giti_commit_action(void* c_, uint32_t action_id, giti_window_opt_t* opt)
         opt->xmax = -1;
         break;
     }
-    case '\n': {
+    case ' ': {
         giti_window_menu_t* gwm = giti_window_menu_create();
         opt->type = S_ITEM_TYPE_MENU;
         opt->menu = gwm->menu;
@@ -862,7 +954,7 @@ giti_commit_shortcut(void* c_, wint_t wch, uint32_t action_id, giti_window_opt_t
     giti_commit_t* c = c_;
 
     bool claimed = false;
-    if (wch == '\n') {
+    if (wch == ' ') {
         claimed = giti_commit_action(c, action_id, opt);
     }
 
@@ -1231,12 +1323,11 @@ giti_branch_action(void* b_, uint32_t action_id, giti_window_opt_t* opt)
     bool claimed = true;
 
     switch (action_id) {
-    case 'l': {
+    case 'l':
         //log("log %s", b->name);
         *opt = giti_log_create(b->name, b->user_email, 10000);
         break;
-    }
-    case '\n': {
+    case ' ': {
         giti_window_menu_t* gwm = giti_window_menu_create();
         opt->menu           = gwm->menu;
         opt->type           = S_ITEM_TYPE_MENU;
@@ -1301,7 +1392,7 @@ giti_branch_shortcut(void* b_, wint_t wch, uint32_t action_id, giti_window_opt_t
 
     bool claimed = false;
 
-    if (wch == '\n') {
+    if (wch == ' ') {
         claimed = giti_branch_action(b, action_id, opt);
     }
 
@@ -1391,6 +1482,236 @@ giti_branches_create(const char* current_branch, const char* user_email)
     return opt;
 }
 
+typedef struct giti_summary {
+    giti_strbuf_t branch;
+    giti_strbuf_t user_name;
+    giti_strbuf_t user_email;
+    dlist_t*      changes;
+    char          text[8096];
+} giti_summary_t;
+
+static bool
+giti_summary_shortcut(void* gs_, wint_t wch, uint32_t action_id, giti_window_opt_t* opt);
+
+static bool
+giti_summary_action(void* gs_, uint32_t action_id, giti_window_opt_t* opt)
+{
+    log(__func__);
+    giti_summary_t* gs = gs_;
+
+    bool claimed = true;
+    switch (action_id) {
+    case 'l':
+        *opt = giti_log_create(gs->branch, gs->user_email, 10000);
+        break;
+    case 'b':
+        *opt = giti_branches_create(gs->branch, gs->user_email);
+        break;
+    case ' ': {
+        giti_window_menu_t* gwm = giti_window_menu_create();
+        opt->type = S_ITEM_TYPE_MENU;
+        opt->menu = gwm->menu;
+        //opt->cb_title = giti_commit_menu_title_str;
+        opt->cb_shortcut = giti_summary_shortcut;
+        opt->cb_destroy = giti_window_menu_destroy;
+        opt->cb_arg = gs;
+        opt->cb_arg_destroy = gwm;
+        opt->xmax = -1;
+
+        giti_menu_item_t* item = NULL;
+        item = calloc(1, sizeof *item);
+        item->type = S_ITEM_TYPE_MENU;
+        item->cb_arg = gs;
+        item->cb_action = giti_summary_action;
+        item->action_id = 'l';
+        strncpy(item->name, "Show log           [l]", sizeof(item->name));
+        dlist_append(gwm->menu, item);
+
+        item = calloc(1, sizeof *item);
+        item->type = S_ITEM_TYPE_MENU;
+        item->cb_arg = gs;
+        item->cb_action = giti_summary_action;
+        item->action_id = 'b';
+        strncpy(item->name, "Show branches      [b]", sizeof(item->name));
+        dlist_append(gwm->menu, item);
+        break;
+    }
+
+#if 0
+    case 'i': {
+        opt->text = giti_commit_info(c);
+        opt->type = S_ITEM_TYPE_TEXT;
+        opt->cb_title = giti_commit_info_title_str;
+        opt->cb_arg = c;
+        opt->xmax = -1;
+        break;
+    }
+    case 'd':
+        giti_commit_diff(c);
+        break;
+    case 'f': {
+        opt->text = giti_commit_files(c);
+        opt->type = S_ITEM_TYPE_TEXT;
+        opt->cb_title = giti_commit_files_title_str;
+        opt->cb_filter = giti_commit_files_color_filter;
+        opt->cb_arg = c;
+        opt->xmax = -1;
+        break;
+    }
+    case ' ': {
+        giti_window_menu_t* gwm = giti_window_menu_create();
+        opt->type = S_ITEM_TYPE_MENU;
+        opt->menu = gwm->menu;
+        opt->cb_title = giti_commit_menu_title_str;
+        opt->cb_shortcut = giti_commit_shortcut;
+        opt->cb_destroy = giti_window_menu_destroy;
+        opt->cb_arg = c;
+        opt->cb_arg_destroy = gwm;
+        opt->xmax = -1;
+
+        giti_menu_item_t* item = NULL;
+        item = calloc(1, sizeof *item);
+        item->type = S_ITEM_TYPE_TEXT;
+        item->cb_arg = c;
+        item->cb_action = giti_commit_action;
+        item->action_id = 'i';
+        strncpy(item->name, "Show commit info       [i]", sizeof(item->name));
+        dlist_append(gwm->menu, item);
+
+        item = calloc(1, sizeof *item);
+        item->type = S_ITEM_TYPE_ACTION;
+        item->cb_arg = c;
+        item->cb_action = giti_commit_action;
+        item->action_id = 'd';
+        strncpy(item->name, "Open commit diff       [d]", sizeof(item->name));
+        dlist_append(gwm->menu, item);
+
+        item = calloc(1, sizeof *item);
+        item->type = S_ITEM_TYPE_TEXT;
+        item->cb_arg = c;
+        item->cb_action = giti_commit_action;
+        item->action_id = 'f';
+        strncpy(item->name, "Show files in commit   [f]", sizeof(item->name));
+        dlist_append(gwm->menu, item);
+        break;
+    }
+#endif
+    default:
+        claimed = false;
+        break;
+    }
+
+    return claimed;
+}
+
+static bool
+giti_summary_shortcut(void* gs_, wint_t wch, uint32_t action_id, giti_window_opt_t* opt)
+{
+    log("[%s] %d %u", __func__, wch, action_id);
+    giti_summary_t* gs = gs_;
+
+    bool claimed = false;
+    switch(wch) {
+    case 'l':
+    case 'b':
+    case ' ':
+        claimed = giti_summary_action(gs, action_id ? action_id : wch, opt);
+        break;
+
+        //claimed = giti_summary_action(gs, action_id, opt);
+        //break;
+    }
+
+    return claimed;
+}
+
+static giti_window_opt_t
+giti_summary_create(const char* branch, const char* user_name, const char* user_email)
+{
+    giti_summary_t* gs = calloc(1, sizeof *gs);
+    gs->changes = dlist_create();
+
+    strncpy(gs->branch, branch, sizeof(gs->branch));
+    strncpy(gs->user_name, user_name, sizeof(gs->user_name));
+    strncpy(gs->user_email, user_email, sizeof(gs->user_email));
+
+    giti_status(gs->changes);
+
+    size_t pos = 0;
+    pos += snprintf(gs->text + pos, sizeof(gs->text) - pos, "<giti-clr-1>GIT<giti-clr-end>i\n");
+    pos += snprintf(gs->text + pos, sizeof(gs->text) - pos, "Hello %s (%s)\n", gs->user_name, gs->user_email);
+    pos += snprintf(gs->text + pos, sizeof(gs->text) - pos, "On Branch <giti-clr-1>%s<giti-clr-1>\n", gs->branch);
+    pos += snprintf(gs->text + pos, sizeof(gs->text) - pos, "\n\n");
+
+    giti_file_status_t* gfs = NULL;
+    dlist_iterator_t* it = dlist_iterator_create(gs->changes);
+
+    size_t pos_staged = 0;
+    size_t pos_unstaged = 0;
+    size_t pos_untracked = 0;
+
+    char staged[1024];
+    char unstaged[1024];
+    char untracked[1024];
+    while ((gfs = dlist_iterator_next(it))) {
+        if (gfs->staged_status == '?' && gfs->unstaged_status == '?') {
+            pos_untracked += snprintf(untracked + pos_untracked, sizeof(untracked) - pos_untracked, "  %s\n", gfs->str);
+            continue;
+        }
+
+        if (gfs->staged_status == 'M') {
+            pos_staged += snprintf(staged + pos_staged, sizeof(staged) - pos_staged, "  Modified: %-20s (<giti-clr-on>%u<giti-clr-end> / <giti-clr-off>%u<giti-clr-end>)\n", gfs->str, gfs->staged.add, gfs->staged.del);
+        }
+        else if (gfs->staged_status == 'A') {
+            pos_staged += snprintf(staged + pos_staged, sizeof(staged) - pos_staged, "  Added:    %-20s (<giti-clr-on>%u<giti-clr-end>)\n", gfs->str, gfs->staged.add);
+        }
+        else if (gfs->staged_status == 'D') {
+            pos_staged += snprintf(staged + pos_staged, sizeof(staged) - pos_staged, "  Deleted:  %-20s (<giti-clr-off>%u<giti-clr-end>)\n", gfs->str, gfs->staged.del);
+        }
+        else if (gfs->staged_status != ' ') {
+            pos_staged += snprintf(staged + pos_staged, sizeof(staged) - pos_staged, "  (UNKOWN) [s:%c|u:%c] %s\n", gfs->staged_status, gfs->unstaged_status, gfs->str);
+        }
+
+        if (gfs->unstaged_status == 'M') {
+            pos_unstaged += snprintf(unstaged + pos_unstaged, sizeof(unstaged) - pos_unstaged, "  Modified: %-20s (<giti-clr-on>%u<giti-clr-end> / <giti-clr-off>%u<giti-clr-end>)\n", gfs->str, gfs->unstaged.add, gfs->unstaged.del);
+        }
+        else if (gfs->unstaged_status == 'D') {
+            pos_unstaged += snprintf(unstaged + pos_unstaged, sizeof(unstaged) - pos_unstaged, "  Deleted:  %-20s (<giti-clr-off>%u<giti-clr-end>)\n", gfs->str, gfs->unstaged.del);
+        }
+        else if (gfs->unstaged_status != ' ') {
+            pos_unstaged += snprintf(unstaged + pos_unstaged, sizeof(unstaged) - pos_unstaged, "  (UNKOWN) [s:%c|u:%c] %s\n", gfs->staged_status, gfs->unstaged_status, gfs->str);
+        }
+
+    }
+
+    if (pos_staged) {
+        pos += snprintf(gs->text + pos, sizeof(gs->text) - pos, "Staged:\n%s\n", staged);
+    }
+
+    if (pos_unstaged) {
+        pos += snprintf(gs->text + pos, sizeof(gs->text) - pos, "Unstaged:\n%s\n", unstaged);
+    }
+
+    if (pos_untracked) {
+        pos += snprintf(gs->text + pos, sizeof(gs->text) - pos, "Untracked:\n%s\n", untracked);
+    }
+    dlist_iterator_destroy(it);
+
+    giti_window_opt_t opt = {
+        .cb_shortcut    = giti_summary_shortcut,
+        //.cb_filter      = giti_log_color_filter,
+        .type           = S_ITEM_TYPE_TEXT,
+        //.cb_title       = giti_log_title_str,
+        //.cb_destroy     = giti_log_destroy,
+        .cb_arg         = gs,
+        //.cb_arg_destroy = gl,
+        .text           = gs->text,
+    };
+
+    return opt;
+}
+
+
 static giti_window_t*
 giti_window_create(giti_window_opt_t opt)
 {
@@ -1409,19 +1730,6 @@ typedef struct giti_window_stack {
     size_t         stack_pos;
     giti_window_t* stack[25];
 } giti_window_stack_t;
-
-static giti_window_stack_t*
-giti_window_stack_create()
-{
-    giti_window_stack_t* gws = calloc(1, sizeof *gws);
-
-    giti_window_t* w = giti_window_create((giti_window_opt_t){ 0 });
-    w->w = newwin(0, 0, 0, 0);
-    keypad(w->w, TRUE);
-    gws->stack[0] = w;
-
-    return gws;
-}
 
 static void
 giti_window_stack_push(giti_window_stack_t* gws, giti_window_opt_t opt)
@@ -1534,6 +1842,21 @@ giti_window_stack_display(giti_window_stack_t* gws)
     }
 }
 
+static giti_window_stack_t*
+giti_window_stack_create(giti_window_opt_t opt)
+{
+    giti_window_stack_t* gws = calloc(1, sizeof *gws);
+
+    giti_window_t* w = giti_window_create(opt);
+    w->w = newwin(0, 0, 0, 0);
+    keypad(w->w, TRUE);
+    gws->stack[0] = w;
+
+    giti_window_stack_display(gws);
+
+    return gws;
+}
+
 /* TODO
  * more below not working
  * Help
@@ -1563,7 +1886,8 @@ main()
     noecho();
     curs_set(0);
 
-    giti_window_stack_t* gws = giti_window_stack_create();
+    giti_window_opt_t opt = giti_summary_create(current_branch, user_name, user_email);
+    giti_window_stack_t* gws = giti_window_stack_create(opt);
 #if 1
     //https://htmlcolorcodes.com/color-chart/
     giti_color_scheme_t cs = {
@@ -1642,19 +1966,8 @@ main()
             case KEY_NPAGE:
                 tw->pos = MIN(giti_window_posmax(tw), tw->pos + 15);
                 break;
-            case 'l': {
-                giti_window_opt_t opt = giti_log_create(current_branch, user_email, 10000);
-                giti_window_stack_push(gws, opt);
+            default:
                 break;
-            }
-            case 'b': {
-                giti_window_opt_t opt = giti_branches_create(current_branch, user_email);
-                giti_window_stack_push(gws, opt);
-                break;
-            }
-            default: {
-                break;
-            }
             }
         }
         giti_window_stack_display(gws);
