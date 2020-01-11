@@ -138,14 +138,14 @@ strwcmp(const wchar_t* needle, const wchar_t* haystack)
 }
 
 static int
-strwcasecmp(const wchar_t* str1, const wchar_t* str2, size_t n)
+strwcasecmp(const wchar_t* s1, const wchar_t* s2, size_t n)
 {
-    if (!str1 || !str2) {
+    if (!s1 || !s2) {
         return -1;
     }
 
-    for (int i = 0; *str1 && *str2 && i < n; ++str1, ++str2, ++n) {
-        if (towlower(*str1) != towlower(*str2)) {
+    for (int i = 0; *s1 && i < n; ++s1, ++s2, ++n) {
+        if (!*s2 | (towlower(*s1) != towlower(*s2))) {
             return -1;
         }
     }
@@ -313,7 +313,7 @@ giti_print(WINDOW* w, dlist_t* color_filter, int y, int x, int xmax, const char*
                     color_filter_t* f = dlist_get(color_filter, i);
 
                     //log("needle: %ls haystack: %ls", f->str, ch);
-                    if (strwcasecmp(ch, f->str, wcslen(f->str)) == 0) {
+                    if (strwcasecmp(f->str, ch, wcslen(f->str)) == 0) {
                         /* match */
                         filter_x_len = wcslen(f->str);
                         filter_x_clr = f->code;
@@ -681,10 +681,10 @@ giti_commit_row(giti_strbuf_t strbuf, void* e_)
     pos += snprintf(strbuf + pos, sizeof(giti_strbuf_t) - pos, "%s <giti-clr-2>%s<giti-clr-end> <giti-clr-3>%s<giti-clr-end>", e->h, e->ci_date, e->ci_time);
 
     if (e->is_self) {
-        pos += snprintf(strbuf + pos, sizeof(giti_strbuf_t) - pos, " <giti-clr-1>%-20s<giti-clr-end>", e->an);
+        pos += snprintf(strbuf + pos, sizeof(giti_strbuf_t) - pos, " <giti-clr-1>%-30s<giti-clr-end>", e->an);
     }
     else {
-        pos += snprintf(strbuf + pos, sizeof(giti_strbuf_t) - pos, " %-20s", e->an);
+        pos += snprintf(strbuf + pos, sizeof(giti_strbuf_t) - pos, " %-30s", e->an);
     }
     pos += snprintf(strbuf + pos, sizeof(giti_strbuf_t) - pos, " %s", e->s);
     return strbuf;
@@ -748,12 +748,12 @@ giti_commit_files_color_filter(void* c_)
     color_filter_t* f = NULL;
 
     f = malloc(sizeof *f);
-    wcsncpy(f->str, L"+", sizeof(f->str));
+    wcsncpy(f->str, L"+", array_size(f->str));
     f->code = 4;
     dlist_append(color_filter, f);
 
     f = malloc(sizeof *f);
-    wcsncpy(f->str, L"-", sizeof(f->str));
+    wcsncpy(f->str, L"-", array_size(f->str));
     f->code = 5;
     dlist_append(color_filter, f);
 
@@ -795,6 +795,7 @@ giti_commit_action(void* c_, uint32_t action_id, giti_window_opt_t* opt)
         opt->text = giti_commit_info(c);
         opt->type = S_ITEM_TYPE_TEXT;
         opt->cb_title = giti_commit_info_title_str;
+        opt->cb_arg = c;
         opt->xmax = -1;
         break;
     }
@@ -897,7 +898,7 @@ giti_log_entries_(const char* user_email, const char* precmd, const char* postcm
         exit(1);
     }
     dlist_t* list = dlist_create();
-    giti_commit_t* e = malloc(sizeof *e);
+    giti_commit_t* e = calloc(1, sizeof *e);
     while (fgets(e->raw, sizeof(e->raw), fp) != NULL) {
         e->h[H_SZ]     = '\0';
         e->ci[19]      = '\0';
@@ -906,7 +907,6 @@ giti_log_entries_(const char* user_email, const char* precmd, const char* postcm
         e->an[AN_SZ]   = '\0';
         e->ae[AE_SZ]   = '\0';
         e->s[S_SZ]     = '\0';
-        e->b           = NULL;
 
         strtrim(e->h);
         strtrim(e->ci);
@@ -926,7 +926,7 @@ giti_log_entries_(const char* user_email, const char* precmd, const char* postcm
             e->is_self = true;
         }
         dlist_append(list, e);
-        e = malloc(sizeof *e);
+        e = calloc(1, sizeof *e);
     }
     free(e);
     pclose(fp);
