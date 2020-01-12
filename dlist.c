@@ -135,7 +135,8 @@ dlist_iterator_t*
 dlist_iterator_create(const dlist_t* dl)
 {
     dlist_iterator_t* it = malloc(sizeof *it);
-    it->head = dl->head;
+
+    it->head = dl->size ? dl->head : NULL;
     it->last = NULL;
 
     return it;
@@ -145,7 +146,9 @@ void*
 dlist_iterator_next(dlist_iterator_t* it)
 {
     void* data = NULL;
-    if (it->last == NULL) {
+    if (it->head == NULL) {
+    }
+    else if (it->last == NULL) {
         it->last = it->head;
         data = it->last->data;
     }

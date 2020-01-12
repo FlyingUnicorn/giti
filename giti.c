@@ -1348,15 +1348,17 @@ giti_branch_action(void* b_, uint32_t action_id, giti_window_opt_t* opt)
         strncpy(item->name, "Show branch log                     [l]", sizeof(item->name));
         dlist_append(gwm->menu, item);
 
-        item = calloc(1, sizeof *item);
-        item->type = S_ITEM_TYPE_MENU;
-        item->cb_arg = b;
-        item->cb_action = giti_branch_action;
-        item->action_id = 12345;
-        strncpy(item->name, "Checkout branch", sizeof(item->name));
-        dlist_append(gwm->menu, item);
+        if (!b->is_current_branch) {
+            item = calloc(1, sizeof *item);
+            item->type = S_ITEM_TYPE_MENU;
+            item->cb_arg = b;
+            item->cb_action = giti_branch_action;
+            item->action_id = 12345;
+            strncpy(item->name, "Checkout branch", sizeof(item->name));
+            dlist_append(gwm->menu, item);
+        }
 
-        if (b->is_current_branch) {
+        if (b->is_current_branch && strncmp(b->name, b->upstream, strlen(b->name)) != 0) {
             item = calloc(1, sizeof *item);
             snprintf(item->name, sizeof(item->name), "Rebase upstream branch: %s", b->upstream);
             item->type = S_ITEM_TYPE_MENU;
@@ -1454,17 +1456,16 @@ giti_branches_destroy(void* gbs_)
 {
     giti_branches_t* gbs = gbs_;
 
-    dlist_destroy(gbs->branches, giti_branch_destroy);
     dlist_destroy(gbs->filtered_branches, free);
     free(gbs);
 }
 
 static giti_window_opt_t
-giti_branches_create(const char* current_branch, const char* user_email)
+giti_branches_create(const char* current_branch, const char* user_email, dlist_t* branches)
 {
     giti_branches_t* gb = calloc(1, sizeof *gb);
-    gb->branches = giti_branch(current_branch, user_email);
     gb->filtered_branches = dlist_create();
+    gb->branches = branches;
     strncpy(gb->current_branch, current_branch, sizeof(gb->current_branch));
 
     giti_window_opt_t opt = {
@@ -1487,8 +1488,19 @@ typedef struct giti_summary {
     giti_strbuf_t user_name;
     giti_strbuf_t user_email;
     dlist_t*      changes;
+    dlist_t*      branches;
     char          text[8096];
 } giti_summary_t;
+
+static void
+giti_summary_destroy(void* gs_)
+{
+    giti_summary_t* gs = gs_;
+
+    dlist_destroy(gs->changes, free);
+    dlist_destroy(gs->branches, giti_branch_destroy);
+    free(gs);
+}
 
 static bool
 giti_summary_shortcut(void* gs_, wint_t wch, uint32_t action_id, giti_window_opt_t* opt);
@@ -1505,7 +1517,7 @@ giti_summary_action(void* gs_, uint32_t action_id, giti_window_opt_t* opt)
         *opt = giti_log_create(gs->branch, gs->user_email, 10000);
         break;
     case 'b':
-        *opt = giti_branches_create(gs->branch, gs->user_email);
+        *opt = giti_branches_create(gs->branch, gs->user_email, gs->branches);
         break;
     case ' ': {
         giti_window_menu_t* gwm = giti_window_menu_create();
@@ -1536,66 +1548,6 @@ giti_summary_action(void* gs_, uint32_t action_id, giti_window_opt_t* opt)
         dlist_append(gwm->menu, item);
         break;
     }
-
-#if 0
-    case 'i': {
-        opt->text = giti_commit_info(c);
-        opt->type = S_ITEM_TYPE_TEXT;
-        opt->cb_title = giti_commit_info_title_str;
-        opt->cb_arg = c;
-        opt->xmax = -1;
-        break;
-    }
-    case 'd':
-        giti_commit_diff(c);
-        break;
-    case 'f': {
-        opt->text = giti_commit_files(c);
-        opt->type = S_ITEM_TYPE_TEXT;
-        opt->cb_title = giti_commit_files_title_str;
-        opt->cb_filter = giti_commit_files_color_filter;
-        opt->cb_arg = c;
-        opt->xmax = -1;
-        break;
-    }
-    case ' ': {
-        giti_window_menu_t* gwm = giti_window_menu_create();
-        opt->type = S_ITEM_TYPE_MENU;
-        opt->menu = gwm->menu;
-        opt->cb_title = giti_commit_menu_title_str;
-        opt->cb_shortcut = giti_commit_shortcut;
-        opt->cb_destroy = giti_window_menu_destroy;
-        opt->cb_arg = c;
-        opt->cb_arg_destroy = gwm;
-        opt->xmax = -1;
-
-        giti_menu_item_t* item = NULL;
-        item = calloc(1, sizeof *item);
-        item->type = S_ITEM_TYPE_TEXT;
-        item->cb_arg = c;
-        item->cb_action = giti_commit_action;
-        item->action_id = 'i';
-        strncpy(item->name, "Show commit info       [i]", sizeof(item->name));
-        dlist_append(gwm->menu, item);
-
-        item = calloc(1, sizeof *item);
-        item->type = S_ITEM_TYPE_ACTION;
-        item->cb_arg = c;
-        item->cb_action = giti_commit_action;
-        item->action_id = 'd';
-        strncpy(item->name, "Open commit diff       [d]", sizeof(item->name));
-        dlist_append(gwm->menu, item);
-
-        item = calloc(1, sizeof *item);
-        item->type = S_ITEM_TYPE_TEXT;
-        item->cb_arg = c;
-        item->cb_action = giti_commit_action;
-        item->action_id = 'f';
-        strncpy(item->name, "Show files in commit   [f]", sizeof(item->name));
-        dlist_append(gwm->menu, item);
-        break;
-    }
-#endif
     default:
         claimed = false;
         break;
@@ -1625,11 +1577,20 @@ giti_summary_shortcut(void* gs_, wint_t wch, uint32_t action_id, giti_window_opt
     return claimed;
 }
 
+static char*
+giti_summary_title_str(void* gs_, giti_strbuf_t strbuf)
+{
+    //giti_summary_t* gs = gs_;
+    snprintf(strbuf, sizeof(giti_strbuf_t), "<giti-clr-1>GIT<giti-clr-end>i");
+    return strbuf;
+}
+
 static giti_window_opt_t
 giti_summary_create(const char* branch, const char* user_name, const char* user_email)
 {
     giti_summary_t* gs = calloc(1, sizeof *gs);
     gs->changes = dlist_create();
+    gs->branches = giti_branch(branch, user_email);
 
     strncpy(gs->branch, branch, sizeof(gs->branch));
     strncpy(gs->user_name, user_name, sizeof(gs->user_name));
@@ -1637,14 +1598,33 @@ giti_summary_create(const char* branch, const char* user_name, const char* user_
 
     giti_status(gs->changes);
 
+    giti_branch_t* gb = NULL;
+    dlist_iterator_t* it = dlist_iterator_create(gs->branches);
+    while ((gb = dlist_iterator_next(it))) {
+        if (strncmp(gs->branch, gb->name, strlen(gs->branch)) == 0) {
+            break;
+        }
+    }
+    dlist_iterator_destroy(it);
+
     size_t pos = 0;
-    pos += snprintf(gs->text + pos, sizeof(gs->text) - pos, "<giti-clr-1>GIT<giti-clr-end>i\n");
     pos += snprintf(gs->text + pos, sizeof(gs->text) - pos, "Hello %s (%s)\n", gs->user_name, gs->user_email);
-    pos += snprintf(gs->text + pos, sizeof(gs->text) - pos, "On Branch <giti-clr-1>%s<giti-clr-1>\n", gs->branch);
+    pos += snprintf(gs->text + pos, sizeof(gs->text) - pos, "On Branch <giti-clr-1>%s<giti-clr-end>", gs->branch);
+    if (strlen(gb->upstream)) {
+        pos += snprintf(gs->text + pos, sizeof(gs->text) - pos, " upstream: <giti-clr-2>%s<giti-clr-end>", gb->upstream);
+    }
+    pos += snprintf(gs->text + pos, sizeof(gs->text) - pos, "\n\n");
+
+    giti_commit_t* c = NULL;
+    it = dlist_iterator_create(gb->commits);
+    while ((c = dlist_iterator_next(it))) {
+        pos += snprintf(gs->text + pos, sizeof(gs->text) - pos, "  %s\n", c->h);
+    }
+
     pos += snprintf(gs->text + pos, sizeof(gs->text) - pos, "\n\n");
 
     giti_file_status_t* gfs = NULL;
-    dlist_iterator_t* it = dlist_iterator_create(gs->changes);
+    it = dlist_iterator_create(gs->changes);
 
     size_t pos_staged = 0;
     size_t pos_unstaged = 0;
@@ -1685,15 +1665,15 @@ giti_summary_create(const char* branch, const char* user_name, const char* user_
     }
 
     if (pos_staged) {
-        pos += snprintf(gs->text + pos, sizeof(gs->text) - pos, "Staged:\n%s\n", staged);
+        pos += snprintf(gs->text + pos, sizeof(gs->text) - pos, "Staged files:\n%s\n", staged);
     }
 
     if (pos_unstaged) {
-        pos += snprintf(gs->text + pos, sizeof(gs->text) - pos, "Unstaged:\n%s\n", unstaged);
+        pos += snprintf(gs->text + pos, sizeof(gs->text) - pos, "Unstaged files:\n%s\n", unstaged);
     }
 
     if (pos_untracked) {
-        pos += snprintf(gs->text + pos, sizeof(gs->text) - pos, "Untracked:\n%s\n", untracked);
+        pos += snprintf(gs->text + pos, sizeof(gs->text) - pos, "Untracked files:\n%s\n", untracked);
     }
     dlist_iterator_destroy(it);
 
@@ -1701,10 +1681,10 @@ giti_summary_create(const char* branch, const char* user_name, const char* user_
         .cb_shortcut    = giti_summary_shortcut,
         //.cb_filter      = giti_log_color_filter,
         .type           = S_ITEM_TYPE_TEXT,
-        //.cb_title       = giti_log_title_str,
-        //.cb_destroy     = giti_log_destroy,
+        .cb_title       = giti_summary_title_str,
+        .cb_destroy     = giti_summary_destroy,
         .cb_arg         = gs,
-        //.cb_arg_destroy = gl,
+        .cb_arg_destroy = gs,
         .text           = gs->text,
     };
 
