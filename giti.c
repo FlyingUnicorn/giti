@@ -1223,8 +1223,9 @@ static void
 giti_branch_destroy(void* gb_)
 {
     giti_branch_t* gb = gb_;
-
-    dlist_destroy(gb->commits, giti_commit_destroy);
+    if (gb->commits) {
+        dlist_destroy(gb->commits, giti_commit_destroy);
+    }
     free(gb);
 }
 
@@ -1256,7 +1257,7 @@ giti_branch(const char* current_branch, const char* user_email)
     FILE *fp;
     char res[4096];
 
-    const char* cmd = "git for-each-ref --format='<giti-start>\n<giti-refname>%(refname:short)\n<giti-upstream>%(upstream:lstrip=-1)\n<giti-end>' --sort=committerdate refs/heads/";
+    const char* cmd = "git for-each-ref --format='<giti-start>\n<giti-refname>%(refname:short)\n<giti-upstream>%(upstream:short)\n<giti-end>' --sort=committerdate refs/heads/";
     fp = popen(cmd, "r");
     if (fp == NULL) {
         printf("Failed to run command\n" );
@@ -1295,7 +1296,7 @@ giti_branch(const char* current_branch, const char* user_email)
 
         if (strlen(b->upstream) != 0) {
             char precmd[1024];
-            snprintf(precmd, sizeof(precmd), "--cherry origin/%s..%s", b->upstream, b->name);
+            snprintf(precmd, sizeof(precmd), "--cherry %s..%s", b->upstream, b->name);
             b->commits = giti_log_entries_(user_email, precmd, NULL);
         }
     }
