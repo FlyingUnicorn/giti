@@ -607,7 +607,6 @@ giti_status_changes(giti_file_status_t* gfs)
     char* end;
     giti_strbuf_t strbuf;
     while (fgets(strbuf, sizeof strbuf, fp) != NULL) {
-        log(strbuf);
         gfs->staged.add = strtoul(strbuf, &end, 10);
         gfs->staged.del = strtoul(end, &end, 10);
     }
@@ -621,7 +620,6 @@ giti_status_changes(giti_file_status_t* gfs)
     }
 
     while (fgets(strbuf, sizeof strbuf, fp) != NULL) {
-        log(strbuf);
         gfs->unstaged.add = strtoul(strbuf, &end, 10);
         gfs->unstaged.del = strtoul(end, &end, 10);
     }
@@ -1297,7 +1295,7 @@ giti_branch(const char* current_branch, const char* user_email)
 
         if (strlen(b->upstream) != 0) {
             char precmd[1024];
-            snprintf(precmd, sizeof(precmd), "--cherry %s..%s", b->upstream, b->name);
+            snprintf(precmd, sizeof(precmd), "--cherry origin/%s..%s", b->upstream, b->name);
             b->commits = giti_log_entries_(user_email, precmd, NULL);
         }
     }
@@ -1508,7 +1506,6 @@ giti_summary_shortcut(void* gs_, wint_t wch, uint32_t action_id, giti_window_opt
 static bool
 giti_summary_action(void* gs_, uint32_t action_id, giti_window_opt_t* opt)
 {
-    log(__func__);
     giti_summary_t* gs = gs_;
 
     bool claimed = true;
@@ -1559,7 +1556,6 @@ giti_summary_action(void* gs_, uint32_t action_id, giti_window_opt_t* opt)
 static bool
 giti_summary_shortcut(void* gs_, wint_t wch, uint32_t action_id, giti_window_opt_t* opt)
 {
-    log("[%s] %d %u", __func__, wch, action_id);
     giti_summary_t* gs = gs_;
 
     bool claimed = false;
@@ -1615,16 +1611,18 @@ giti_summary_create(const char* branch, const char* user_name, const char* user_
     }
     pos += snprintf(gs->text + pos, sizeof(gs->text) - pos, "\n\n");
 
-    giti_commit_t* c = NULL;
-    it = dlist_iterator_create(gb->commits);
-    while ((c = dlist_iterator_next(it))) {
-        pos += snprintf(gs->text + pos, sizeof(gs->text) - pos, "  %s\n", c->h);
+    if (dlist_size(gb->commits)) {
+        pos += snprintf(gs->text + pos, sizeof(gs->text) - pos, "Commits relative to upstream\n");
+
+        giti_commit_t* c = NULL;
+        it = dlist_iterator_create(gb->commits);
+        while ((c = dlist_iterator_next(it))) {
+            pos += snprintf(gs->text + pos, sizeof(gs->text) - pos, "  %s %s %s %-20s %s\n", c->h, c->ci_date, c->ci_time, c->an, c->s);
+        }
+        dlist_iterator_destroy(it);
+
+        pos += snprintf(gs->text + pos, sizeof(gs->text) - pos, "\n\n");
     }
-
-    pos += snprintf(gs->text + pos, sizeof(gs->text) - pos, "\n\n");
-
-    giti_file_status_t* gfs = NULL;
-    it = dlist_iterator_create(gs->changes);
 
     size_t pos_staged = 0;
     size_t pos_unstaged = 0;
@@ -1633,6 +1631,9 @@ giti_summary_create(const char* branch, const char* user_name, const char* user_
     char staged[1024];
     char unstaged[1024];
     char untracked[1024];
+
+    giti_file_status_t* gfs = NULL;
+    it = dlist_iterator_create(gs->changes);
     while ((gfs = dlist_iterator_next(it))) {
         if (gfs->staged_status == '?' && gfs->unstaged_status == '?') {
             pos_untracked += snprintf(untracked + pos_untracked, sizeof(untracked) - pos_untracked, "  %s\n", gfs->str);
@@ -1640,29 +1641,29 @@ giti_summary_create(const char* branch, const char* user_name, const char* user_
         }
 
         if (gfs->staged_status == 'M') {
-            pos_staged += snprintf(staged + pos_staged, sizeof(staged) - pos_staged, "  Modified: %-20s (<giti-clr-on>%u<giti-clr-end> / <giti-clr-off>%u<giti-clr-end>)\n", gfs->str, gfs->staged.add, gfs->staged.del);
+            pos_staged += snprintf(staged + pos_staged, sizeof(staged) - pos_staged, "  Modified: %s (<giti-clr-on>%u<giti-clr-end> / <giti-clr-off>%u<giti-clr-end>)\n", gfs->str, gfs->staged.add, gfs->staged.del);
         }
         else if (gfs->staged_status == 'A') {
-            pos_staged += snprintf(staged + pos_staged, sizeof(staged) - pos_staged, "  Added:    %-20s (<giti-clr-on>%u<giti-clr-end>)\n", gfs->str, gfs->staged.add);
+            pos_staged += snprintf(staged + pos_staged, sizeof(staged) - pos_staged, "  Added:    %s (<giti-clr-on>%u<giti-clr-end>)\n", gfs->str, gfs->staged.add);
         }
         else if (gfs->staged_status == 'D') {
-            pos_staged += snprintf(staged + pos_staged, sizeof(staged) - pos_staged, "  Deleted:  %-20s (<giti-clr-off>%u<giti-clr-end>)\n", gfs->str, gfs->staged.del);
+            pos_staged += snprintf(staged + pos_staged, sizeof(staged) - pos_staged, "  Deleted:  %s (<giti-clr-off>%u<giti-clr-end>)\n", gfs->str, gfs->staged.del);
         }
         else if (gfs->staged_status != ' ') {
             pos_staged += snprintf(staged + pos_staged, sizeof(staged) - pos_staged, "  (UNKOWN) [s:%c|u:%c] %s\n", gfs->staged_status, gfs->unstaged_status, gfs->str);
         }
 
         if (gfs->unstaged_status == 'M') {
-            pos_unstaged += snprintf(unstaged + pos_unstaged, sizeof(unstaged) - pos_unstaged, "  Modified: %-20s (<giti-clr-on>%u<giti-clr-end> / <giti-clr-off>%u<giti-clr-end>)\n", gfs->str, gfs->unstaged.add, gfs->unstaged.del);
+            pos_unstaged += snprintf(unstaged + pos_unstaged, sizeof(unstaged) - pos_unstaged, "  Modified: %s (<giti-clr-on>%u<giti-clr-end> / <giti-clr-off>%u<giti-clr-end>)\n", gfs->str, gfs->unstaged.add, gfs->unstaged.del);
         }
         else if (gfs->unstaged_status == 'D') {
-            pos_unstaged += snprintf(unstaged + pos_unstaged, sizeof(unstaged) - pos_unstaged, "  Deleted:  %-20s (<giti-clr-off>%u<giti-clr-end>)\n", gfs->str, gfs->unstaged.del);
+            pos_unstaged += snprintf(unstaged + pos_unstaged, sizeof(unstaged) - pos_unstaged, "  Deleted:  %s (<giti-clr-off>%u<giti-clr-end>)\n", gfs->str, gfs->unstaged.del);
         }
         else if (gfs->unstaged_status != ' ') {
             pos_unstaged += snprintf(unstaged + pos_unstaged, sizeof(unstaged) - pos_unstaged, "  (UNKOWN) [s:%c|u:%c] %s\n", gfs->staged_status, gfs->unstaged_status, gfs->str);
         }
-
     }
+    dlist_iterator_destroy(it);
 
     if (pos_staged) {
         pos += snprintf(gs->text + pos, sizeof(gs->text) - pos, "Staged files:\n%s\n", staged);
@@ -1675,7 +1676,6 @@ giti_summary_create(const char* branch, const char* user_name, const char* user_
     if (pos_untracked) {
         pos += snprintf(gs->text + pos, sizeof(gs->text) - pos, "Untracked files:\n%s\n", untracked);
     }
-    dlist_iterator_destroy(it);
 
     giti_window_opt_t opt = {
         .cb_shortcut    = giti_summary_shortcut,
