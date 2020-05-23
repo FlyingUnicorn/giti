@@ -2124,7 +2124,7 @@ main()
 
     giti_window_opt_t opt = giti_summary_create(current_branch, user_name, user_email);
     giti_window_stack_t* gws = giti_window_stack_create(opt);
-#if 1
+#if 0
     //https://htmlcolorcodes.com/color-chart/
     giti_color_scheme_t cs = {
         .fg          = (giti_color_t){ .c = 0xD1F2EB },
