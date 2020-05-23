@@ -7,8 +7,12 @@
 #include <locale.h>
 #include <ncurses.h>
 #include <stddef.h>
+#include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <sys/time.h>
+#include <time.h>
+#include <unistd.h>
 #include <wchar.h>
 #include <wctype.h>
 
@@ -26,6 +30,20 @@
 
 #define log(format, ...) fprintf(stderr, format, ##__VA_ARGS__); fprintf(stderr, "\n")
 #define array_size(a) (sizeof a) / (sizeof (a)[0])
+
+
+#define GITI_CONFIG_TIMEOUT_DEFAULT_MS 100
+#define GITI_CONFIG_TIMEOUT_STR "timeout"
+#define GITI_CONFIG_FRIENDS_DEFAULT "torvalds@linux-foundation.org\n  olof@lixom.net"
+#define GITI_CONFIG_FRIENDS_STR "friends"
+
+typedef struct giti_config {
+    long     timeout;
+    dlist_t* friends;
+} giti_config_t;
+
+giti_config_t* g_config;
+
 
 typedef char giti_strbuf_t[256];
 typedef char giti_strbuf_info_t[4096];
@@ -102,6 +120,20 @@ strtrim(char* str)
     str[pos + 1] = '\0';
 
     return str;
+}
+
+static char*
+strtrimall(char* str)
+{
+    while(*str != '\0') {
+        if (isspace(*str)) {
+            ++str;
+        }
+        else {
+            break;
+        }
+    }
+    return strtrim(str);
 }
 
 static int
@@ -745,6 +777,7 @@ typedef struct giti_commit {
     char* b;
     char* files;
     bool is_self;
+    bool is_friend;
     giti_strbuf_info_t info;
 } giti_commit_t;
 
@@ -772,6 +805,9 @@ giti_commit_row(giti_strbuf_t strbuf, void* e_)
 
     if (e->is_self) {
         pos += snprintf(strbuf + pos, sizeof(giti_strbuf_t) - pos, " <giti-clr-1>%-30s<giti-clr-end>", e->an);
+    }
+    else if (e->is_friend) {
+        pos += snprintf(strbuf + pos, sizeof(giti_strbuf_t) - pos, " <giti-clr-on>%-30s<giti-clr-end>", e->an);
     }
     else {
         pos += snprintf(strbuf + pos, sizeof(giti_strbuf_t) - pos, " %-30s", e->an);
@@ -962,11 +998,12 @@ giti_commit_shortcut(void* c_, wint_t wch, uint32_t action_id, giti_window_opt_t
 /* GITi Log */
 typedef struct giti_log {
     giti_strbuf_t branch;
-    giti_strbuf_t  user_email;
+    giti_strbuf_t user_email;
     dlist_t*      entries;
     dlist_t*      filtered_entries;
     struct {
         bool      self;
+        bool      friends;
         wchar_t   str[256];
         size_t    str_pos;
         bool      active;
@@ -976,7 +1013,7 @@ typedef struct giti_log {
 } giti_log_t;
 
 static dlist_t*
-giti_log_entries_(const char* user_email, const char* precmd, const char* postcmd)
+giti_log_entries_(const char* user_email, const char* precmd, const char* postcmd, uint32_t max_duration_ms)
 {
     FILE *fp;
     char cmd[512];
@@ -987,8 +1024,17 @@ giti_log_entries_(const char* user_email, const char* precmd, const char* postcm
         printf("Failed to run command\n" );
         exit(1);
     }
+
+    long start_ms = 0;
+    struct timeval timecheck;
+    if (max_duration_ms) {
+        gettimeofday(&timecheck, NULL);
+        start_ms = (long)timecheck.tv_sec * 1000 + (long)timecheck.tv_usec / 1000;
+    }
+
     dlist_t* list = dlist_create();
     giti_commit_t* e = calloc(1, sizeof *e);
+    uint64_t cnt = 0;
     while (fgets(e->raw, sizeof(e->raw), fp) != NULL) {
         e->h[H_SZ]     = '\0';
         e->ci[19]      = '\0';
@@ -1015,8 +1061,32 @@ giti_log_entries_(const char* user_email, const char* precmd, const char* postcm
         if (strncmp(user_email, e->ae, strlen(user_email)) == 0) {
             e->is_self = true;
         }
+        else {
+            const char* friend = NULL;
+            dlist_iterator_t* it = dlist_iterator_create(g_config->friends);
+            while ((friend = dlist_iterator_next(it))) {
+                if (strncmp(friend, e->ae, strlen(friend)) == 0) {
+                    e->is_friend = true;
+                    break;
+                }
+            }
+            dlist_iterator_destroy(it);
+        }
+
         dlist_append(list, e);
+        ++cnt;
+
         e = calloc(1, sizeof *e);
+
+        if (cnt % 1000 == 0 && start_ms) {
+            gettimeofday(&timecheck, NULL);
+            long now_ms = (long)timecheck.tv_sec * 1000 + (long)timecheck.tv_usec / 1000;
+            if (now_ms > start_ms + max_duration_ms) {
+                log("[%s] fetched %lu entries took: %lu ms", __func__, cnt, now_ms - start_ms);
+                break;
+              }
+        }
+
     }
     free(e);
     pclose(fp);
@@ -1033,7 +1103,7 @@ giti_log_entries(const char* branch, const char* user_email, size_t entries)
     char postcmd[512];
     snprintf(postcmd, sizeof(postcmd), "%s --", branch);
 
-    return giti_log_entries_(user_email, precmd, postcmd);
+    return giti_log_entries_(user_email, precmd, postcmd, 500);
 }
 
 static void
@@ -1055,8 +1125,13 @@ giti_log_filter(giti_log_t* gl)
         swprintf(wstr, array_size(wstr), L"%s %s %s %s %s", e->h, e->ci_date, e->an, e->ae, e->s);
 
         const wchar_t* str = gl->filter.str_pos ? gl->filter.str : NULL;
-        bool match = (!gl->filter.self || (gl->filter.self && strstr(gl->user_email, e->ae))) &&
-            (!str || (str && strwcmp(str, wstr)));
+        //bool match = false;
+        //match |= (!gl->filter.self || (gl->filter.self && strstr(gl->user_email, e->ae))) && (!str || (str && strwcmp(str, wstr)));
+
+        bool match = str && strwcmp(str, wstr);
+        match |= !gl->filter.self && !gl->filter.friends;
+        match |= gl->filter.self && e->is_self;
+        match |= gl->filter.friends && e->is_friend;
 
         if (match) {
             ++gl->filter.found;
@@ -1098,6 +1173,9 @@ giti_log_shortcut(void* gl_, wint_t wch, uint32_t action_id, giti_window_opt_t* 
         switch (wch) {
         case 'm':
             gl->filter.self = !gl->filter.self;
+            break;
+        case 'M':
+            gl->filter.friends = !gl->filter.friends;
             break;
         case 's':
             gl->filter.active = true;
@@ -1187,6 +1265,16 @@ giti_log_destroy(void* gl_)
 static giti_window_opt_t
 giti_log_create(const char* branch, const char* user_email, size_t entries)
 {
+
+    long start, end;
+    struct timeval timecheck;
+
+    gettimeofday(&timecheck, NULL);
+    start = (long)timecheck.tv_sec * 1000 + (long)timecheck.tv_usec / 1000;
+
+
+
+
     giti_log_t* gl = calloc(1, sizeof *gl);
 
     strncpy(gl->branch, branch, sizeof(gl->branch));
@@ -1206,6 +1294,10 @@ giti_log_create(const char* branch, const char* user_email, size_t entries)
         .cb_arg_destroy = gl,
         .menu           = gl->filtered_entries,
     };
+
+    gettimeofday(&timecheck, NULL);
+    end = (long)timecheck.tv_sec * 1000 + (long)timecheck.tv_usec / 1000;
+    log("[%s] fetched %lu entries took %ld ms", __func__, entries, (end - start));
 
     return opt;
 }
@@ -1297,7 +1389,7 @@ giti_branch(const char* current_branch, const char* user_email)
         if (strlen(b->upstream) != 0) {
             char precmd[1024];
             snprintf(precmd, sizeof(precmd), "--cherry %s..%s", b->upstream, b->name);
-            b->commits = giti_log_entries_(user_email, precmd, NULL);
+            b->commits = giti_log_entries_(user_email, precmd, NULL, 500);
         }
     }
 
@@ -1512,7 +1604,7 @@ giti_summary_action(void* gs_, uint32_t action_id, giti_window_opt_t* opt)
     bool claimed = true;
     switch (action_id) {
     case 'l':
-        *opt = giti_log_create(gs->branch, gs->user_email, 10000);
+        *opt = giti_log_create(gs->branch, gs->user_email, 100000);
         break;
     case 'b':
         *opt = giti_branches_create(gs->branch, gs->user_email, gs->branches);
@@ -1835,11 +1927,146 @@ giti_window_stack_create(giti_window_opt_t opt)
 
     giti_window_stack_display(gws);
 
+    long start, end;
+
+    struct timeval timecheck;
+
+    gettimeofday(&timecheck, NULL);
+    start = (long)timecheck.tv_sec * 1000 + (long)timecheck.tv_usec / 1000;
+
+    usleep(200000);  // 200ms
+
+    gettimeofday(&timecheck, NULL);
+    end = (long)timecheck.tv_sec * 1000 + (long)timecheck.tv_usec / 1000;
+
+    log("%ld milliseconds elapsed\n", (end - start));
+
+
     return gws;
 }
 
+char*
+giti_config_default_create()
+{
+    char* str_config = NULL;
+    int len = asprintf(&str_config,
+"# --== GITi Config ==--\n"\
+"%s: %u\n"\
+"%s:\n" \
+"  %s",
+
+GITI_CONFIG_TIMEOUT_STR,
+GITI_CONFIG_TIMEOUT_DEFAULT_MS,
+GITI_CONFIG_FRIENDS_STR,
+GITI_CONFIG_FRIENDS_DEFAULT);
+
+    return len > 0 ? str_config : NULL;
+}
+
+const char*
+giti_config_get_value(const char* str) {
+
+   char* str_value = strchr(str, ':');
+
+   while (!isprint(*str_value)) {
+       if (*str_value == '\n') {
+           str_value = NULL;
+           goto exit;
+       }
+       else {
+           str_value += 1;
+       }
+   }
+
+ exit:
+   return str_value;
+}
+
+giti_config_t*
+giti_config_create(char* str_config)
+{
+    str_config = str_config ? str_config : giti_config_default_create();
+
+    giti_config_t* config = malloc(sizeof *config);
+    *config = (giti_config_t) {
+        .timeout = GITI_CONFIG_TIMEOUT_DEFAULT_MS,
+    };
+
+    log("%s\n", str_config);
+    char* curline = str_config;
+    bool friends = false;
+    while(curline) {
+        char* nextLine = strchr(curline, '\n');
+        if (nextLine) {
+            *nextLine = '\0';
+            nextLine += 1;
+        }
+
+        if (curline[0] == '#') {
+            goto next;
+        }
+
+
+        if (friends) {
+            if (isspace(curline[0])) {
+                char* str_friend = strtrimall(curline);
+                log("friend: %s\n%s", str_friend, nextLine);
+                if (!config->friends) {
+                    config->friends = dlist_create();
+                }
+                dlist_append(config->friends, strdup(str_friend));
+            }
+            else {
+                friends = false;
+            }
+        }
+
+        if (strncmp(curline, GITI_CONFIG_TIMEOUT_STR, strlen(GITI_CONFIG_TIMEOUT_STR)) == 0) {
+            const char* str_value = giti_config_get_value(curline);
+            if (str_value) {
+                config->timeout = atol(str_value);
+            }
+        }
+        else if (strncmp(curline, GITI_CONFIG_FRIENDS_STR, strlen(GITI_CONFIG_FRIENDS_STR)) == 0) {
+            friends = true;
+        }
+
+
+next:
+        curline = nextLine;
+    }
+
+    return config;
+}
+
+void
+giti_config_print(const giti_config_t* config)
+{
+    log("--== GITi Config ==--");
+    log("%s: %ld", GITI_CONFIG_TIMEOUT_STR, config->timeout);
+    if (config->friends) {
+        log("%s:", GITI_CONFIG_FRIENDS_STR);
+
+        dlist_iterator_t* it = dlist_iterator_create(config->friends);
+
+        const char* str_friend = NULL;
+        while ((str_friend = dlist_iterator_next(it))) {
+            log("  \"%s\"", str_friend);
+        }
+        dlist_iterator_destroy(it);
+    }
+}
+
+
 /* TODO
+ * version number
  * more below not working
+ * scrolling
+ * signal handler
+ * dot file
+ * git rebase crash
+ * git rebase option
+ * git branch show remote
  * Help
  * arguments
  * start sceen
@@ -1855,6 +2082,33 @@ main()
     setlocale(LC_ALL, "");
     log("-- START --");
 
+
+    const char* path_config = getenv("GITI_CONFIG_FILE");
+    if (!path_config) {
+        path_config = "~/.gitirc";
+    }
+    char* str_config = NULL;
+    FILE* f = fopen(path_config, "r");
+    if (f) {
+        fseek(f, 0L, SEEK_END);
+        long len = ftell(f);
+        fseek(f, 0L, SEEK_SET);
+        str_config = calloc(1, len + 1);
+        fread(str_config, 1, len, f);
+        fclose(f);
+
+        printf("The file called test.dat contains this text\n\n%s", str_config);
+    }
+
+    log("config:\n%s", str_config);
+
+
+    g_config = giti_config_create(str_config);
+    if (str_config) {
+        free(str_config);
+    }
+    giti_config_print(g_config);
+
     char* user_name = giti_user_name();
     char* user_email = giti_user_email();
     char* current_branch = giti_current_branch();
@@ -1866,6 +2120,7 @@ main()
     start_color();
     noecho();
     curs_set(0);
+
 
     giti_window_opt_t opt = giti_summary_create(current_branch, user_name, user_email);
     giti_window_stack_t* gws = giti_window_stack_create(opt);
@@ -1951,6 +2206,7 @@ main()
                 break;
             }
         }
+
         giti_window_stack_display(gws);
     }
 
