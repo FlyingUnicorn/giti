@@ -18,6 +18,9 @@
 
 #include "dlist.h"
 
+#include "giti_config.h"
+#include "giti_log.h"
+
 #define MIN(v1, v2) (((v1) < (v2)) ? (v1) : (v2))
 #define MAX(v1, v2) (((v1) > (v2)) ? (v1) : (v2))
 
@@ -28,19 +31,8 @@
 #define AE_SZ 40
 #define S_SZ  256
 
-#define log(format, ...) fprintf(stderr, format, ##__VA_ARGS__); fprintf(stderr, "\n")
 #define array_size(a) (sizeof a) / (sizeof (a)[0])
 
-
-#define GITI_CONFIG_TIMEOUT_DEFAULT_MS 100
-#define GITI_CONFIG_TIMEOUT_STR "timeout"
-#define GITI_CONFIG_FRIENDS_DEFAULT "torvalds@linux-foundation.org\n  olof@lixom.net"
-#define GITI_CONFIG_FRIENDS_STR "friends"
-
-typedef struct giti_config {
-    long     timeout;
-    dlist_t* friends;
-} giti_config_t;
 
 giti_config_t* g_config;
 
@@ -1943,118 +1935,6 @@ giti_window_stack_create(giti_window_opt_t opt)
 
 
     return gws;
-}
-
-char*
-giti_config_default_create()
-{
-    char* str_config = NULL;
-    int len = asprintf(&str_config,
-"# --== GITi Config ==--\n"\
-"%s: %u\n"\
-"%s:\n" \
-"  %s",
-
-GITI_CONFIG_TIMEOUT_STR,
-GITI_CONFIG_TIMEOUT_DEFAULT_MS,
-GITI_CONFIG_FRIENDS_STR,
-GITI_CONFIG_FRIENDS_DEFAULT);
-
-    return len > 0 ? str_config : NULL;
-}
-
-const char*
-giti_config_get_value(const char* str) {
-
-   char* str_value = strchr(str, ':');
-
-   while (!isprint(*str_value)) {
-       if (*str_value == '\n') {
-           str_value = NULL;
-           goto exit;
-       }
-       else {
-           str_value += 1;
-       }
-   }
-
- exit:
-   return str_value;
-}
-
-giti_config_t*
-giti_config_create(char* str_config)
-{
-    str_config = str_config ? str_config : giti_config_default_create();
-
-    giti_config_t* config = malloc(sizeof *config);
-    *config = (giti_config_t) {
-        .timeout = GITI_CONFIG_TIMEOUT_DEFAULT_MS,
-    };
-
-    log("%s\n", str_config);
-    char* curline = str_config;
-    bool friends = false;
-    while(curline) {
-        char* nextLine = strchr(curline, '\n');
-        if (nextLine) {
-            *nextLine = '\0';
-            nextLine += 1;
-        }
-
-        if (curline[0] == '#') {
-            goto next;
-        }
-
-
-        if (friends) {
-            if (isspace(curline[0])) {
-                char* str_friend = strtrimall(curline);
-                log("friend: %s\n%s", str_friend, nextLine);
-                if (!config->friends) {
-                    config->friends = dlist_create();
-                }
-                dlist_append(config->friends, strdup(str_friend));
-            }
-            else {
-                friends = false;
-            }
-        }
-
-        if (strncmp(curline, GITI_CONFIG_TIMEOUT_STR, strlen(GITI_CONFIG_TIMEOUT_STR)) == 0) {
-            const char* str_value = giti_config_get_value(curline);
-            if (str_value) {
-                config->timeout = atol(str_value);
-            }
-        }
-        else if (strncmp(curline, GITI_CONFIG_FRIENDS_STR, strlen(GITI_CONFIG_FRIENDS_STR)) == 0) {
-            friends = true;
-        }
-
-
-next:
-        curline = nextLine;
-    }
-
-    return config;
-}
-
-void
-giti_config_print(const giti_config_t* config)
-{
-    log("--== GITi Config ==--");
-    log("%s: %ld", GITI_CONFIG_TIMEOUT_STR, config->timeout);
-    if (config->friends) {
-        log("%s:", GITI_CONFIG_FRIENDS_STR);
-
-        dlist_iterator_t* it = dlist_iterator_create(config->friends);
-
-        const char* str_friend = NULL;
-        while ((str_friend = dlist_iterator_next(it))) {
-            log("  \"%s\"", str_friend);
-        }
-        dlist_iterator_destroy(it);
-    }
 }
 
 
