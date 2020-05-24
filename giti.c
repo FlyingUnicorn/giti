@@ -912,7 +912,6 @@ giti_commit_shortcut(void* c_, wint_t wch, uint32_t action_id, giti_window_opt_t
 /* GITi Log */
 typedef struct giti_log {
     giti_strbuf_t branch;
-    giti_strbuf_t user_email;
     dlist_t*      entries;
     dlist_t*      filtered_entries;
     struct {
@@ -927,7 +926,7 @@ typedef struct giti_log {
 } giti_log_t;
 
 static dlist_t*
-giti_log_entries_(const char* user_email, const char* precmd, const char* postcmd, uint32_t max_duration_ms)
+giti_log_entries_(const char* precmd, const char* postcmd, uint32_t max_duration_ms)
 {
     FILE *fp;
     char cmd[512];
@@ -972,7 +971,7 @@ giti_log_entries_(const char* user_email, const char* precmd, const char* postcm
         //log("e->ae: %s", e->ae);
         //log("e->s:  %s", e->s);
 
-        if (strncmp(user_email, e->ae, strlen(user_email)) == 0) {
+        if (strncmp(g_config->general.user_email, e->ae, strlen(e->ae)) == 0) {
             e->is_self = true;
         }
         else {
@@ -1009,7 +1008,7 @@ giti_log_entries_(const char* user_email, const char* precmd, const char* postcm
 }
 
 static dlist_t*
-giti_log_entries(const char* branch, const char* user_email, size_t entries)
+giti_log_entries(const char* branch, size_t entries)
 {
     char precmd[512];
     snprintf(precmd, sizeof(precmd), "-n %lu", entries);
@@ -1017,7 +1016,7 @@ giti_log_entries(const char* branch, const char* user_email, size_t entries)
     char postcmd[512];
     snprintf(postcmd, sizeof(postcmd), "%s --", branch);
 
-    return giti_log_entries_(user_email, precmd, postcmd, g_config->general.timeout);
+    return giti_log_entries_(precmd, postcmd, g_config->general.timeout);
 }
 
 static void
@@ -1177,14 +1176,14 @@ giti_log_destroy(void* gl_)
 }
 
 static giti_window_opt_t
-giti_log_create(const char* branch, const char* user_email, size_t entries)
+giti_log_create(const char* branch, size_t entries)
 {
     giti_log_t* gl = calloc(1, sizeof *gl);
 
     strncpy(gl->branch, branch, sizeof(gl->branch));
-    strncpy(gl->user_email, user_email, sizeof(gl->user_email));
 
-    gl->entries = giti_log_entries(branch, user_email, entries);
+    gl->entries = giti_log_entries(branch,
+    entries);
 
     giti_log_filter(gl);
 
@@ -1206,7 +1205,6 @@ giti_log_create(const char* branch, const char* user_email, size_t entries)
 typedef struct giti_branch {
     giti_strbuf_t name;
     giti_strbuf_t upstream;
-    giti_strbuf_t user_email;
     dlist_t*      commits;
     bool          is_current_branch;
 } giti_branch_t;
@@ -1244,7 +1242,7 @@ giti_branch_commit_row(giti_strbuf_t strbuf, void* e_)
 }
 
 static dlist_t*
-giti_branch(const char* current_branch, const char* user_email)
+giti_branch(const char* current_branch)
 {
     FILE *fp;
     char res[4096];
@@ -1266,7 +1264,6 @@ giti_branch(const char* current_branch, const char* user_email)
             b->name[0] = '\0';
             b->upstream[0] = '\0';
             b->commits = NULL;
-            strncpy(b->user_email, user_email, sizeof(b->user_email));
         }
         else if (strncmp(res, "<giti-refname>", strlen("<giti-refname>")) == 0) {
             strncpy(b->name, res + strlen("<giti-refname>"), sizeof(b->name) - 1);
@@ -1289,7 +1286,7 @@ giti_branch(const char* current_branch, const char* user_email)
         if (strlen(b->upstream) != 0) {
             char precmd[1024];
             snprintf(precmd, sizeof(precmd), "--cherry %s..%s", b->upstream, b->name);
-            b->commits = giti_log_entries_(user_email, precmd, NULL, g_config->general.timeout);
+            b->commits = giti_log_entries_(precmd, NULL, g_config->general.timeout);
         }
     }
 
@@ -1316,7 +1313,7 @@ giti_branch_action(void* b_, uint32_t action_id, giti_window_opt_t* opt)
     switch (action_id) {
     case 'l':
         //log("log %s", b->name);
-        *opt = giti_log_create(b->name, b->user_email, 10000);
+        *opt = giti_log_create(b->name, 10000);
         break;
     case ' ': {
         giti_window_menu_t* gwm = giti_window_menu_create();
@@ -1452,7 +1449,7 @@ giti_branches_destroy(void* gbs_)
 }
 
 static giti_window_opt_t
-giti_branches_create(const char* current_branch, const char* user_email, dlist_t* branches)
+giti_branches_create(const char* current_branch, dlist_t* branches)
 {
     giti_branches_t* gb = calloc(1, sizeof *gb);
     gb->filtered_branches = dlist_create();
@@ -1476,8 +1473,6 @@ giti_branches_create(const char* current_branch, const char* user_email, dlist_t
 
 typedef struct giti_summary {
     giti_strbuf_t branch;
-    giti_strbuf_t user_name;
-    giti_strbuf_t user_email;
     dlist_t*      changes;
     dlist_t*      branches;
     char          text[8096];
@@ -1504,10 +1499,10 @@ giti_summary_action(void* gs_, uint32_t action_id, giti_window_opt_t* opt)
     bool claimed = true;
     switch (action_id) {
     case 'l':
-        *opt = giti_log_create(gs->branch, gs->user_email, 100000);
+        *opt = giti_log_create(gs->branch, 100000);
         break;
     case 'b':
-        *opt = giti_branches_create(gs->branch, gs->user_email, gs->branches);
+        *opt = giti_branches_create(gs->branch, gs->branches);
         break;
     case ' ': {
         giti_window_menu_t* gwm = giti_window_menu_create();
@@ -1575,15 +1570,13 @@ giti_summary_title_str(void* gs_, giti_strbuf_t strbuf)
 }
 
 static giti_window_opt_t
-giti_summary_create(const char* branch, const char* user_name, const char* user_email)
+giti_summary_create(const char* branch)
 {
     giti_summary_t* gs = calloc(1, sizeof *gs);
     gs->changes = dlist_create();
-    gs->branches = giti_branch(branch, user_email);
+    gs->branches = giti_branch(branch);
 
     strncpy(gs->branch, branch, sizeof(gs->branch));
-    strncpy(gs->user_name, user_name, sizeof(gs->user_name));
-    strncpy(gs->user_email, user_email, sizeof(gs->user_email));
 
     giti_status(gs->changes);
 
@@ -1597,7 +1590,7 @@ giti_summary_create(const char* branch, const char* user_name, const char* user_
     dlist_iterator_destroy(it);
 
     size_t pos = 0;
-    pos += snprintf(gs->text + pos, sizeof(gs->text) - pos, "Hello %s (%s)\n", gs->user_name, gs->user_email);
+    pos += snprintf(gs->text + pos, sizeof(gs->text) - pos, "Hello %s (%s)\n", g_config->general.user_name, g_config->general.user_email);
     pos += snprintf(gs->text + pos, sizeof(gs->text) - pos, "On Branch <giti-clr-1>%s<giti-clr-end>", gs->branch);
     if (strlen(gb->upstream)) {
         pos += snprintf(gs->text + pos, sizeof(gs->text) - pos, " upstream: <giti-clr-2>%s<giti-clr-end>", gb->upstream);
@@ -1889,23 +1882,24 @@ main()
     }
 
     log("config:\n%s", str_config);
+
     char* user_name = giti_user_name();
     char* user_email = giti_user_email();
-
     g_config = giti_config_create(str_config, user_name, user_email);
+    free(user_name);
+    free(user_email);
+
     giti_config_print(g_config);
 
     char* current_branch = giti_current_branch();
 
-    log("user name:  %s", user_name);
-    log("user email: %s", user_email);
 
     initscr();
     start_color();
     noecho();
     curs_set(0);
 
-    giti_window_opt_t opt = giti_summary_create(current_branch, user_name, user_email);
+    giti_window_opt_t opt = giti_summary_create(current_branch);
     giti_window_stack_t* gws = giti_window_stack_create(opt);
 #if 1
     //https://htmlcolorcodes.com/color-chart/
@@ -1989,8 +1983,6 @@ main()
 
 exit:
     giti_window_stack_destroy(gws);
-    free(user_name);
-    free(user_email);
     free(current_branch);
 
     log("-- END --");
