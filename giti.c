@@ -1469,12 +1469,32 @@ giti_branches_create(const char* current_branch, dlist_t* branches)
     return opt;
 }
 
+
 typedef struct giti_summary {
     giti_strbuf_t branch;
     dlist_t*      changes;
     dlist_t*      branches;
     char          text[8096];
+    char*         help;
 } giti_summary_t;
+
+static char*
+giti_summary_help(giti_summary_t* gs)
+{
+    if (!gs->help) {
+        gs->help = giti_config_to_string(g_config);
+    }
+    return gs->help;
+}
+
+static char*
+giti_summary_help_title_str(void* gs_, giti_strbuf_t strbuf)
+{
+    (void)gs_;
+   
+    snprintf(strbuf, sizeof(giti_strbuf_t), "Help");
+    return strbuf;
+}
 
 static void
 giti_summary_destroy(void* gs_)
@@ -1495,14 +1515,13 @@ giti_summary_action(void* gs_, uint32_t action_id, giti_window_opt_t* opt)
     giti_summary_t* gs = gs_;
 
     bool claimed = true;
-    switch (action_id) {
-    case 'l':
+    if (action_id == 'l') {
         *opt = giti_log_create(gs->branch, 100000);
-        break;
-    case 'b':
+    }
+    else if (action_id == 'b') {
         *opt = giti_branches_create(gs->branch, gs->branches);
-        break;
-    case ' ': {
+    }
+    else if (action_id == ' ') {
         giti_window_menu_t* gwm = giti_window_menu_create();
         opt->type = S_ITEM_TYPE_MENU;
         opt->menu = gwm->menu;
@@ -1529,11 +1548,10 @@ giti_summary_action(void* gs_, uint32_t action_id, giti_window_opt_t* opt)
         item->action_id = 'b';
         strncpy(item->name, "Show branches      [b]", sizeof(item->name));
         dlist_append(gwm->menu, item);
-        break;
+
     }
-    default:
+    else {
         claimed = false;
-        break;
     }
 
     return claimed;
@@ -1545,15 +1563,16 @@ giti_summary_shortcut(void* gs_, wint_t wch, uint32_t action_id, giti_window_opt
     giti_summary_t* gs = gs_;
 
     bool claimed = false;
-    switch(wch) {
-    case 'l':
-    case 'b':
-    case ' ':
+    if (wch == 'l' || wch == 'b'|| wch == ' ') {
         claimed = giti_summary_action(gs, action_id ? action_id : wch, opt);
-        break;
-
-        //claimed = giti_summary_action(gs, action_id, opt);
-        //break;
+    }
+    else if (wch == (wint_t)g_config->keybinding.help) {
+        opt->text = giti_summary_help(gs);
+        opt->type = S_ITEM_TYPE_TEXT;
+        opt->cb_title = giti_summary_help_title_str;
+        opt->cb_arg = gs;
+        opt->xmax = -1;
+        claimed = true;
     }
 
     return claimed;
@@ -1850,6 +1869,9 @@ giti_window_stack_create(giti_window_opt_t opt)
  * start sceen
  *        uncommited changed
  *        log diff to upstream
+ * config
+ *  - clenaup memory
+ *  - create config
  */
 
 /* MAIN */

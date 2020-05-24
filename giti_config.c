@@ -23,11 +23,11 @@
 #define STR_HELP       "keybinding.help"
 
 #define DEFAULT_TIMEOUT 500
-#define DEFAULT_FRIENDS "torvalds@linux-foundation.org"
+#define DEFAULT_FRIENDS ""
 #define DEFAULT_UP      'k'
 #define DEFAULT_DOWN    'j'
 #define DEFAULT_BACK    'q'
-#define DEFAULT_HELP    'q'
+#define DEFAULT_HELP    '?'
 
 giti_config_t config;
 
@@ -161,6 +161,7 @@ giti_config_default_create()
 %-6s: %c                \n\
 %-6s: %c                \n\
 %-6s: %c                \n\
+%-6s: %c                \n\
                         \n\
 %s: %s",
 
@@ -173,6 +174,8 @@ STR_DOWN,
 DEFAULT_DOWN,
 STR_BACK,
 DEFAULT_BACK,
+STR_HELP,
+DEFAULT_HELP,
 
 STR_FRIENDS,
 DEFAULT_FRIENDS);
@@ -245,7 +248,6 @@ next:
     return &config;
 }
 
-
 void
 giti_config_print(const giti_config_t* config_)
 {
@@ -279,4 +281,42 @@ giti_config_print(const giti_config_t* config_)
 
   CONFIG
 #undef X
+}
+
+char*
+giti_config_to_string(const giti_config_t* config_)
+{
+  (void)config_;
+
+  size_t buf_sz = 4096;
+  size_t written = 0;
+  char* str = calloc(1, buf_sz);
+
+  group_t last_group = GROUP_INVALID;
+  log("--== GITi Config ==--");
+#define X(group, header, op, def, ptr)                                              \
+  if (group != last_group) {                                                        \
+    switch(group) {                                                                 \
+    case GENERAL:                                                                   \
+      written += snprintf(str + written, buf_sz - written, "-= General =-\n");      \
+      break;                                                                        \
+    case KEYBINDING:                                                                \
+      written += snprintf(str + written, buf_sz - written, "\n-= Keybinding =-\n"); \
+      break;                                                                        \
+    case FRIENDS:                                                                   \
+      written += snprintf(str + written, buf_sz - written, "\n-= Friends =-\n");    \
+      break;                                                                        \
+    default:                                                                        \
+      assert(false);                                                                \
+    }                                                                               \
+    last_group = group;                                                             \
+  }                                                                                 \
+                                                                                    \
+  written += snprintf_param(ptr, str + written, buf_sz - written, header, op);      \
+  written += snprintf(str + written, buf_sz - written, "\n");                       \
+
+  CONFIG
+#undef X
+
+ return str;
 }

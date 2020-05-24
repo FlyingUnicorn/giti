@@ -25,4 +25,7 @@ giti_config_create(char* str_config, const char* user_name, const char* user_ema
 void
 giti_config_print(const giti_config_t* config);
 
+char*
+giti_config_to_string(const giti_config_t* config);
+
 #endif
