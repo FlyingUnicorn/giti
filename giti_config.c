@@ -20,10 +20,45 @@
 #define STR_DOWN    "down"
 
 
-#define DEFAULT_TIMEOUT 500 /* ms */
+#define DEFAULT_TIMEOUT 500
 #define DEFAULT_FRIENDS "torvalds@linux-foundation.org\n  olof@lixom.net"
 #define DEFAULT_UP      'k'
 #define DEFAULT_DOWN    'j'
+
+
+
+
+#define FMT(T) _Generic( (T), char: "%c", int: "%d", long: "%ld", char*: "%s", default: "")
+static void
+print()
+{
+
+  log("--------------------------");
+
+  int x = 0;
+  (void)x;
+
+  const char* t =FMT(x);
+
+  (void)t;
+
+  log(t, x);
+
+
+
+
+#if 0
+#define X(str, tpe, def)                        \
+      tpe v = def; \
+      char* s = "%s -> " + FMT(v)
+      log(s, str, v);
+  CONFIG
+#undef X
+#endif
+
+    log("--------------------------");
+}
+
 
 
 static char*
@@ -79,6 +114,8 @@ giti_config_get_value(const char* str) {
 giti_config_t*
 giti_config_create(char* str_config)
 {
+    print();
+
     str_config = str_config ? str_config : giti_config_default_create();
 
     log("config:\n%s", str_config);
