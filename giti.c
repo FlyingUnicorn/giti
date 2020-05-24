@@ -3,8 +3,8 @@
 #define _GNU_SOURCE
 
 #include <assert.h>
-#include <ctype.h>
 #include <locale.h>
+#include <ctype.h>
 #include <ncurses.h>
 #include <stddef.h>
 #include <stdio.h>
@@ -20,6 +20,7 @@
 
 #include "giti_config.h"
 #include "giti_log.h"
+#include "giti_string.h"
 
 #define MIN(v1, v2) (((v1) < (v2)) ? (v1) : (v2))
 #define MAX(v1, v2) (((v1) > (v2)) ? (v1) : (v2))
@@ -98,85 +99,6 @@ typedef struct giti_menu_item {
 } giti_menu_item_t;
 
 /* HELPER FUNCTIONS GENERAL */
-static char*
-strtrim(char* str)
-{
-    size_t len = strlen(str);
-
-    if (len == 0) {
-        return str;
-    }
-
-    int pos = len - 1;
-    for (; pos > 0 && isspace(str[pos]); --pos) { }
-    str[pos + 1] = '\0';
-
-    return str;
-}
-
-static char*
-strtrimall(char* str)
-{
-    while(*str != '\0') {
-        if (isspace(*str)) {
-            ++str;
-        }
-        else {
-            break;
-        }
-    }
-    return strtrim(str);
-}
-
-static int
-strlines(const char* str)
-{
-    int lines = 0;
-    for (const char* ch = str; *ch; ++ch) {
-        if (*ch == '\n') {
-            ++lines;
-        }
-    }
-    return lines;
-}
-
-static bool
-strwcmp(const wchar_t* needle, const wchar_t* haystack)
-{
-    if (needle == NULL || haystack == NULL || wcslen(needle) > wcslen(haystack)) {
-        return false;
-    }
-
-    for (; *haystack ; ++haystack) {
-        bool match = true;
-        for (const wchar_t* h = haystack, *n = needle; *n; ++n, ++h) {
-            if (towlower(*n) != towlower(*h)) {
-                match = false;
-                break;
-            }
-        }
-        if (match) {
-            return true;
-        }
-    }
-    return false;
-}
-
-static int
-strwcasecmp(const wchar_t* s1, const wchar_t* s2, size_t n)
-{
-    if (!s1 || !s2) {
-        return -1;
-    }
-
-    for (int i = 0; *s1 && i < n; ++s1, ++s2, ++n) {
-        if (!*s2 | (towlower(*s1) != towlower(*s2))) {
-            return -1;
-        }
-    }
-    return 0;
-}
-
 static size_t
 strlen_formatted(const char* str)
 {
@@ -1095,7 +1017,7 @@ giti_log_entries(const char* branch, const char* user_email, size_t entries)
     char postcmd[512];
     snprintf(postcmd, sizeof(postcmd), "%s --", branch);
 
-    return giti_log_entries_(user_email, precmd, postcmd, 500);
+    return giti_log_entries_(user_email, precmd, postcmd, g_config->timeout);
 }
 
 static void
@@ -1257,16 +1179,6 @@ giti_log_destroy(void* gl_)
 static giti_window_opt_t
 giti_log_create(const char* branch, const char* user_email, size_t entries)
 {
-
-    long start, end;
-    struct timeval timecheck;
-
-    gettimeofday(&timecheck, NULL);
-    start = (long)timecheck.tv_sec * 1000 + (long)timecheck.tv_usec / 1000;
-
-
-
-
     giti_log_t* gl = calloc(1, sizeof *gl);
 
     strncpy(gl->branch, branch, sizeof(gl->branch));
@@ -1286,10 +1198,6 @@ giti_log_create(const char* branch, const char* user_email, size_t entries)
         .cb_arg_destroy = gl,
         .menu           = gl->filtered_entries,
     };
-
-    gettimeofday(&timecheck, NULL);
-    end = (long)timecheck.tv_sec * 1000 + (long)timecheck.tv_usec / 1000;
-    log("[%s] fetched %lu entries took %ld ms", __func__, entries, (end - start));
 
     return opt;
 }
@@ -1381,7 +1289,7 @@ giti_branch(const char* current_branch, const char* user_email)
         if (strlen(b->upstream) != 0) {
             char precmd[1024];
             snprintf(precmd, sizeof(precmd), "--cherry %s..%s", b->upstream, b->name);
-            b->commits = giti_log_entries_(user_email, precmd, NULL, 500);
+            b->commits = giti_log_entries_(user_email, precmd, NULL, g_config->timeout);
         }
     }
 
@@ -1984,9 +1892,6 @@ main()
 
 
     g_config = giti_config_create(str_config);
-    if (str_config) {
-        free(str_config);
-    }
     giti_config_print(g_config);
 
     char* user_name = giti_user_name();
@@ -2000,7 +1905,6 @@ main()
     start_color();
     noecho();
     curs_set(0);
-
 
     giti_window_opt_t opt = giti_summary_create(current_branch, user_name, user_email);
     giti_window_stack_t* gws = giti_window_stack_create(opt);
@@ -2062,28 +1966,22 @@ main()
         }
 
         if (!claimed) {
-            switch (ch) {
-            case 'q':
+            if (ch == 'q') {
                 if (giti_window_stack_pop(gws)) {
                     goto exit;
                 }
-                break;
-            case KEY_UP:
-            case 'p':
+            }
+            else if (ch == KEY_UP || ch == (wint_t)g_config->navigation.up) {
                 tw->pos = MAX(0, tw->pos - 1);
-                break;
-            case KEY_DOWN:
-            case 'n':
+            }
+            else if (ch == KEY_DOWN || ch == (wint_t)g_config->navigation.down) {
                 tw->pos = MIN(giti_window_posmax(tw), tw->pos + 1);
-                break;
-            case KEY_PPAGE:
+            }
+            else if (ch == KEY_PPAGE) {
                 tw->pos = MAX(0, tw->pos - 15);
-                break;
-            case KEY_NPAGE:
+            }
+            else if (ch == KEY_NPAGE) {
                 tw->pos = MIN(giti_window_posmax(tw), tw->pos + 15);
-                break;
-            default:
-                break;
             }
         }
 
