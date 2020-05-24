@@ -34,9 +34,10 @@ enum {
 };
 
 #define CONFIG \
-  X(STR_TIMEOUT, SET, DEFAULT_TIMEOUT, config.timeout)         \
-  X(STR_UP,      SET, DEFAULT_UP,      config.navigation.up)   \
-  X(STR_DOWN,    SET, DEFAULT_DOWN,    config.navigation.down) \
+  X(STR_TIMEOUT, SET,    DEFAULT_TIMEOUT, config.timeout)         \
+  X(STR_UP,      SET,    DEFAULT_UP,      config.navigation.up)   \
+  X(STR_DOWN,    SET,    DEFAULT_DOWN,    config.navigation.down) \
+  X(STR_FRIENDS, APPEND, "",              config.friends)   \
 
 #define FMT(T) _Generic( (T), \
     char:  "%c",              \
