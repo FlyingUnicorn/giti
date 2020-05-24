@@ -20,12 +20,14 @@
 #define STR_UP         "keybinding.up"
 #define STR_DOWN       "keybinding.down"
 #define STR_BACK       "keybinding.back"
+#define STR_HELP       "keybinding.help"
 
 #define DEFAULT_TIMEOUT 500
 #define DEFAULT_FRIENDS "torvalds@linux-foundation.org"
 #define DEFAULT_UP      'k'
 #define DEFAULT_DOWN    'j'
 #define DEFAULT_BACK    'q'
+#define DEFAULT_HELP    'q'
 
 giti_config_t config;
 
@@ -49,6 +51,7 @@ typedef enum group {
   X(KEYBINDING, STR_UP,         VALUE, DEFAULT_UP,      &config.keybinding.up)      \
   X(KEYBINDING, STR_DOWN,       VALUE, DEFAULT_DOWN,    &config.keybinding.down)    \
   X(KEYBINDING, STR_BACK,       VALUE, DEFAULT_BACK,    &config.keybinding.back)    \
+  X(KEYBINDING, STR_HELP,       VALUE, DEFAULT_HELP,    &config.keybinding.help)    \
   X(FRIENDS,    STR_FRIENDS,    LIST,  DEFAULT_FRIENDS, config.friends)             \
 
 size_t

@@ -13,6 +13,7 @@ typedef struct giti_config {
     char up;
     char down;
     char back;
+    char help;
   } keybinding;
   dlist_t* friends;
 } giti_config_t;
