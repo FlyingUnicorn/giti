@@ -5,6 +5,7 @@
 
 #include "giti_config.h"
 
+#include <assert.h>
 #include <ctype.h>
 #include <stdbool.h>
 #include <stdio.h>
@@ -14,46 +15,120 @@
 #include "giti_log.h"
 #include "giti_string.h"
 
-#define STR_TIMEOUT "timeout"
+#define STR_TIMEOUT "general.timeout"
 #define STR_FRIENDS "friends"
-#define STR_UP      "up"
-#define STR_DOWN    "down"
-
+#define STR_UP      "keybinding.up"
+#define STR_DOWN    "keybinding.down"
+#define STR_BACK    "keybinding.back"
 
 #define DEFAULT_TIMEOUT 500
-#define DEFAULT_FRIENDS "torvalds@linux-foundation.org\n  olof@lixom.net"
+#define DEFAULT_FRIENDS "torvalds@linux-foundation.org"
 #define DEFAULT_UP      'k'
 #define DEFAULT_DOWN    'j'
-
+#define DEFAULT_BACK    'q'
 
 giti_config_t config;
 
-enum {
+typedef enum op {
+    OP_INVALID,
     SET,
-    APPEND,
-};
+    LIST_APPEND,
+} op_t;
+
+typedef enum group {
+    GROUP_INVALID,
+    GENERAL,
+    NAVIGATION,
+    FRIENDS,
+} group_t;
 
 #define CONFIG \
-  X(STR_TIMEOUT, SET,    DEFAULT_TIMEOUT, config.timeout)         \
-  X(STR_UP,      SET,    DEFAULT_UP,      config.navigation.up)   \
-  X(STR_DOWN,    SET,    DEFAULT_DOWN,    config.navigation.down) \
-  X(STR_FRIENDS, APPEND, "",              config.friends)   \
+  X(GENERAL,    STR_TIMEOUT, SET,         DEFAULT_TIMEOUT, &config.timeout)         \
+  X(NAVIGATION, STR_UP,      SET,         DEFAULT_UP,      &config.navigation.up)   \
+  X(NAVIGATION, STR_DOWN,    SET,         DEFAULT_DOWN,    &config.navigation.down) \
+  X(NAVIGATION, STR_BACK,    SET,         DEFAULT_BACK,    &config.navigation.back) \
+  X(FRIENDS,    STR_FRIENDS, LIST_APPEND, DEFAULT_FRIENDS, config.friends)          \
 
 #define FMT(T) _Generic( (T), \
     char:  "%c",              \
     int:   "%d",              \
     long:  "%ld",             \
-    char*: "%s"               \
 )
 
 
-long format_long(const char* str) { return atol(str); }
-char format_char(const char* str) { return *str; }
+size_t
+snprintf_char(char* buf, size_t buf_sz, const char* header, op_t op, void* ptr)
+{
+  assert(op == SET);
 
+  return snprintf(buf, buf_sz, "%s: %c", header, *(char*)ptr);
+}
 
-#define format(T, str) _Generic( (T), \
-    char: format_char(str),           \
-    long: format_long(str)            \
+size_t
+snprintf_long(char* buf, size_t buf_sz, const char* header, op_t op, void* ptr)
+{
+  assert(op == SET);
+
+  return snprintf(buf, buf_sz, "%s: %lu", header, *(long*)ptr);
+}
+
+size_t
+snprintf__(char* buf, size_t buf_sz, const char* header, op_t op, void* ptr)
+{
+  size_t pos = 0;
+  dlist_iterator_t* it = dlist_iterator_create((dlist_t*)ptr);
+
+  const char* str_friend = NULL;
+  while ((str_friend = dlist_iterator_next(it))) {
+    pos += snprintf(buf + pos, buf_sz - pos, "%s: %s\n", header, str_friend);
+  }
+  dlist_iterator_destroy(it);
+
+  return 0;
+}
+
+#define xxx(T, buf, buf_sz, header, op, ptr) _Generic( (T), \
+    char*: snprintf_char(buf, buf_sz, header, op, ptr),      \
+    long*: snprintf_long(buf, buf_sz, header, op, ptr),       \
+    default: snprintf__(buf, buf_sz, header, op, ptr)        \
+)
+
+void
+format_long(op_t op, const char* str, void* ptr)
+{
+  assert(op == SET);
+
+  long* p = ptr;
+  *p = atol(str);
+}
+
+void
+format_char(op_t op, const char* str, void* ptr)
+{
+  assert(op == SET);
+
+  char* p = ptr;
+  *p = *str;
+}
+
+void
+format_(op_t op, const char* str, void* ptr)
+{
+  (void)str;
+  switch (op) {
+    case LIST_APPEND:
+      dlist_append((dlist_t*)ptr, strdup(str));
+      break;
+    default:
+      log("failed: %s", str);
+      assert(false);
+  }
+}
+
+#define format(T, op, str, ptr) _Generic( (T), \
+    char*: format_char(op, str, ptr),           \
+    long*: format_long(op, str, ptr),           \
+    default: format_(op, str, ptr)             \
 )
 
 #if 0
@@ -109,9 +184,9 @@ giti_config_default_create()
 # Navigation            \n\
 %-6s: %c                \n\
 %-6s: %c                \n\
+%-6s: %c                \n\
                         \n\
-%s:                     \n\
-  %s",
+%s: %s",
 
 STR_TIMEOUT,
 DEFAULT_TIMEOUT,
@@ -120,6 +195,8 @@ STR_UP,
 DEFAULT_UP,
 STR_DOWN,
 DEFAULT_DOWN,
+STR_BACK,
+DEFAULT_BACK,
 
 STR_FRIENDS,
 DEFAULT_FRIENDS);
@@ -171,11 +248,9 @@ giti_config_line(const char* line)
     return;
   }
 
-#define X(str, op, def, ptr)                     \
+#define X(group, str, op, def, ptr)                     \
     if (strncmp(str, line, strlen(str)) == 0) {  \
-      if (op == SET) {                           \
-          ptr = format(ptr, value);              \
-      }                                          \
+      format(ptr, op, value, ptr);              \
     }
 
     CONFIG
@@ -304,9 +379,43 @@ next:
 #endif
 
 void
-giti_config_print(const giti_config_t* config)
+giti_config_print(const giti_config_t* config_)
 {
-    log("--== GITi Config ==--");
+  (void)config_;
+
+  char pos = 0;
+  char buffer[512];
+
+  group_t last_group = GROUP_INVALID;
+  log("--== GITi Config ==--");
+#define X(group, str, op, def, ptr)                                        \
+  if (group != last_group) { \
+    switch(group) {           \
+    case GENERAL: \
+      log("-= General =-"); \
+      break; \
+    case NAVIGATION: \
+      log("\n-= Navigation =-"); \
+      break; \
+    case FRIENDS: \
+      log("\n-= Friends =-");\
+      break; \
+    default:\
+      assert(false); \
+    } \
+    last_group = group; \
+  } \
+\
+  xxx(ptr, buffer + pos, sizeof(buffer) - pos, str, op, ptr);  \
+  log("%s", buffer); \
+
+  CONFIG
+#undef X
+
+
+
+    return;
+#if 0
     log("%s: %ld\n", STR_TIMEOUT, config->timeout);
     log("Navigation");
     log("  up  : %c", config->navigation.up);
@@ -323,4 +432,5 @@ giti_config_print(const giti_config_t* config)
         }
         dlist_iterator_destroy(it);
     }
+    #endif
 }

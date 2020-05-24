@@ -1966,7 +1966,7 @@ main()
         }
 
         if (!claimed) {
-            if (ch == 'q') {
+            if (ch == (wint_t)g_config->navigation.back) {
                 if (giti_window_stack_pop(gws)) {
                     goto exit;
                 }

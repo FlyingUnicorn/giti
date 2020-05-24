@@ -10,6 +10,7 @@ typedef struct giti_config {
     struct {
       char up;
       char down;
+      char back;
     } navigation;
 } giti_config_t;
 
