@@ -1843,7 +1843,6 @@ giti_window_stack_create(giti_window_opt_t opt)
  * version number
  * more below not working
  * scrolling
- * signal handler
  * dot file
  * git rebase crash
  * git rebase option

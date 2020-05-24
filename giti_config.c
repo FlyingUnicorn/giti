@@ -25,7 +25,7 @@
 #define DEFAULT_FRIENDS "torvalds@linux-foundation.org"
 #define DEFAULT_UP      'k'
 #define DEFAULT_DOWN    'j'
-#define DEFAULT_BACK    'q'
+#define DEFAULT_BACK    't'
 
 giti_config_t config;
 
