@@ -25,7 +25,7 @@
 #define DEFAULT_FRIENDS "torvalds@linux-foundation.org"
 #define DEFAULT_UP      'k'
 #define DEFAULT_DOWN    'j'
-#define DEFAULT_BACK    't'
+#define DEFAULT_BACK    'q'
 
 giti_config_t config;
 
@@ -38,7 +38,7 @@ typedef enum op {
 typedef enum group {
     GROUP_INVALID,
     GENERAL,
-    NAVIGATION,
+    KEYBINDING,
     FRIENDS,
 } group_t;
 
@@ -46,9 +46,9 @@ typedef enum group {
   X(GENERAL,    STR_TIMEOUT,    VALUE, DEFAULT_TIMEOUT, &config.general.timeout)    \
   X(GENERAL,    STR_USER_NAME,  VALUE, NULL,            &config.general.user_name)  \
   X(GENERAL,    STR_USER_EMAIL, VALUE, NULL,            &config.general.user_email) \
-  X(NAVIGATION, STR_UP,         VALUE, DEFAULT_UP,      &config.navigation.up)      \
-  X(NAVIGATION, STR_DOWN,       VALUE, DEFAULT_DOWN,    &config.navigation.down)    \
-  X(NAVIGATION, STR_BACK,       VALUE, DEFAULT_BACK,    &config.navigation.back)    \
+  X(KEYBINDING, STR_UP,         VALUE, DEFAULT_UP,      &config.keybinding.up)      \
+  X(KEYBINDING, STR_DOWN,       VALUE, DEFAULT_DOWN,    &config.keybinding.down)    \
+  X(KEYBINDING, STR_BACK,       VALUE, DEFAULT_BACK,    &config.keybinding.back)    \
   X(FRIENDS,    STR_FRIENDS,    LIST,  DEFAULT_FRIENDS, config.friends)             \
 
 size_t
@@ -154,7 +154,7 @@ giti_config_default_create()
 "# --== GITi Config ==--\n\
 %s: %u                  \n\
                         \n\
-# Navigation            \n\
+# Keybinding            \n\
 %-6s: %c                \n\
 %-6s: %c                \n\
 %-6s: %c                \n\
@@ -259,8 +259,8 @@ giti_config_print(const giti_config_t* config_)
     case GENERAL:                                                    \
       log("-= General =-");                                          \
       break;                                                         \
-    case NAVIGATION:                                                 \
-      log("\n-= Navigation =-");                                     \
+    case KEYBINDING:                                                 \
+      log("\n-= Keybinding =-");                                     \
       break;                                                         \
     case FRIENDS:                                                    \
       log("\n-= Friends =-");                                        \

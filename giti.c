@@ -1083,36 +1083,34 @@ giti_log_shortcut(void* gl_, wint_t wch, uint32_t action_id, giti_window_opt_t* 
         }
     }
     else {
-        switch (wch) {
-        case 'm':
+        if (wch == 'm') {
             gl->filter.self = !gl->filter.self;
-            break;
-        case 'M':
+        }
+        else if (wch == 'M') {
             gl->filter.friends = !gl->filter.friends;
-            break;
-        case 's':
+        }
+        else if (wch == 's') {
             gl->filter.active = true;
             gl->filter.show_all = false;
             gl->filter.str_pos = 0;
             memset(gl->filter.str, 0, sizeof(gl->filter.str));
-            break;
-        case 'S':
+        }
+        else if (wch == 'S') {
             gl->filter.active = true;
             gl->filter.show_all = true;
             gl->filter.str_pos = 0;
             memset(gl->filter.str, 0, sizeof(gl->filter.str));
-            break;
-        case 'q':
+        }
+        else if (wch == (wint_t)g_config->keybinding.back) {
             if (gl->filter.str_pos) {
                 gl->filter.str_pos = 0;
             }
             else {
                 claimed = false;
             }
-            break;
-        default:
+        }
+        else {
             claimed = false;
-            break;
         }
     }
 
@@ -1958,15 +1956,15 @@ main()
         }
 
         if (!claimed) {
-            if (ch == (wint_t)g_config->navigation.back) {
+            if (ch == (wint_t)g_config->keybinding.back) {
                 if (giti_window_stack_pop(gws)) {
                     goto exit;
                 }
             }
-            else if (ch == KEY_UP || ch == (wint_t)g_config->navigation.up) {
+            else if (ch == KEY_UP || ch == (wint_t)g_config->keybinding.up) {
                 tw->pos = MAX(0, tw->pos - 1);
             }
-            else if (ch == KEY_DOWN || ch == (wint_t)g_config->navigation.down) {
+            else if (ch == KEY_DOWN || ch == (wint_t)g_config->keybinding.down) {
                 tw->pos = MIN(giti_window_posmax(tw), tw->pos + 1);
             }
             else if (ch == KEY_PPAGE) {
