@@ -1017,7 +1017,7 @@ giti_log_entries(const char* branch, const char* user_email, size_t entries)
     char postcmd[512];
     snprintf(postcmd, sizeof(postcmd), "%s --", branch);
 
-    return giti_log_entries_(user_email, precmd, postcmd, g_config->timeout);
+    return giti_log_entries_(user_email, precmd, postcmd, g_config->general.timeout);
 }
 
 static void
@@ -1289,7 +1289,7 @@ giti_branch(const char* current_branch, const char* user_email)
         if (strlen(b->upstream) != 0) {
             char precmd[1024];
             snprintf(precmd, sizeof(precmd), "--cherry %s..%s", b->upstream, b->name);
-            b->commits = giti_log_entries_(user_email, precmd, NULL, g_config->timeout);
+            b->commits = giti_log_entries_(user_email, precmd, NULL, g_config->general.timeout);
         }
     }
 
@@ -1889,13 +1889,12 @@ main()
     }
 
     log("config:\n%s", str_config);
-
-
-    g_config = giti_config_create(str_config);
-    giti_config_print(g_config);
-
     char* user_name = giti_user_name();
     char* user_email = giti_user_email();
+
+    g_config = giti_config_create(str_config, user_name, user_email);
+    giti_config_print(g_config);
+
     char* current_branch = giti_current_branch();
 
     log("user name:  %s", user_name);
