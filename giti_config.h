@@ -4,14 +4,17 @@
 #include "dlist.h"
 
 typedef struct giti_config {
-    long     timeout;
-    dlist_t* friends;
-
+  struct {
+    char* username;
+    char* email;
+    long  timeout;
+    } general;
     struct {
       char up;
       char down;
       char back;
     } navigation;
+    dlist_t* friends;
 } giti_config_t;
 
 

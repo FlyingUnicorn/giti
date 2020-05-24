@@ -15,11 +15,12 @@
 #include "giti_log.h"
 #include "giti_string.h"
 
-#define STR_TIMEOUT "general.timeout"
-#define STR_FRIENDS "friends"
-#define STR_UP      "keybinding.up"
-#define STR_DOWN    "keybinding.down"
-#define STR_BACK    "keybinding.back"
+#define STR_TIMEOUT  "general.timeout"
+#define STR_USERNAME "general.username"
+#define STR_FRIENDS  "friends"
+#define STR_UP       "keybinding.up"
+#define STR_DOWN     "keybinding.down"
+#define STR_BACK     "keybinding.back"
 
 #define DEFAULT_TIMEOUT 500
 #define DEFAULT_FRIENDS "torvalds@linux-foundation.org"
@@ -31,8 +32,8 @@ giti_config_t config;
 
 typedef enum op {
     OP_INVALID,
-    SET,
-    LIST_APPEND,
+    VALUE,
+    LIST,
 } op_t;
 
 typedef enum group {
@@ -43,11 +44,12 @@ typedef enum group {
 } group_t;
 
 #define CONFIG \
-  X(GENERAL,    STR_TIMEOUT, SET,         DEFAULT_TIMEOUT, &config.timeout)         \
-  X(NAVIGATION, STR_UP,      SET,         DEFAULT_UP,      &config.navigation.up)   \
-  X(NAVIGATION, STR_DOWN,    SET,         DEFAULT_DOWN,    &config.navigation.down) \
-  X(NAVIGATION, STR_BACK,    SET,         DEFAULT_BACK,    &config.navigation.back) \
-  X(FRIENDS,    STR_FRIENDS, LIST_APPEND, DEFAULT_FRIENDS, config.friends)          \
+  X(GENERAL,    STR_TIMEOUT,  VALUE, DEFAULT_TIMEOUT, &config.general.timeout)  \
+  X(GENERAL,    STR_USERNAME, VALUE, "",              &config.general.username) \
+  X(NAVIGATION, STR_UP,       VALUE, DEFAULT_UP,      &config.navigation.up)    \
+  X(NAVIGATION, STR_DOWN,     VALUE, DEFAULT_DOWN,    &config.navigation.down)  \
+  X(NAVIGATION, STR_BACK,     VALUE, DEFAULT_BACK,    &config.navigation.back)  \
+  X(FRIENDS,    STR_FRIENDS,  LIST,  DEFAULT_FRIENDS, config.friends)           \
 
 #define FMT(T) _Generic( (T), \
     char:  "%c",              \
@@ -55,11 +57,10 @@ typedef enum group {
     long:  "%ld",             \
 )
 
-
 size_t
 snprintf_char(char* buf, size_t buf_sz, const char* header, op_t op, void* ptr)
 {
-  assert(op == SET);
+  assert(op == VALUE);
 
   return snprintf(buf, buf_sz, "%s: %c", header, *(char*)ptr);
 }
@@ -67,9 +68,17 @@ snprintf_char(char* buf, size_t buf_sz, const char* header, op_t op, void* ptr)
 size_t
 snprintf_long(char* buf, size_t buf_sz, const char* header, op_t op, void* ptr)
 {
-  assert(op == SET);
+  assert(op == VALUE);
 
   return snprintf(buf, buf_sz, "%s: %lu", header, *(long*)ptr);
+}
+
+size_t
+snprintf_string(char* buf, size_t buf_sz, const char* header, op_t op, void* ptr)
+{
+  assert(op == VALUE);
+
+  return snprintf(buf, buf_sz, "%s: %s", header, (char*)ptr);
 }
 
 size_t
@@ -88,15 +97,16 @@ snprintf__(char* buf, size_t buf_sz, const char* header, op_t op, void* ptr)
 }
 
 #define xxx(T, buf, buf_sz, header, op, ptr) _Generic( (T), \
-    char*: snprintf_char(buf, buf_sz, header, op, ptr),      \
-    long*: snprintf_long(buf, buf_sz, header, op, ptr),       \
-    default: snprintf__(buf, buf_sz, header, op, ptr)        \
+    char*: snprintf_char(buf, buf_sz, header, op, ptr),     \
+    long*: snprintf_long(buf, buf_sz, header, op, ptr),     \
+    char** : snprintf_string(buf, buf_sz, header, op, ptr), \
+    default: snprintf__(buf, buf_sz, header, op, ptr)       \
 )
 
 void
 format_long(op_t op, const char* str, void* ptr)
 {
-  assert(op == SET);
+  assert(op == VALUE);
 
   long* p = ptr;
   *p = atol(str);
@@ -105,7 +115,7 @@ format_long(op_t op, const char* str, void* ptr)
 void
 format_char(op_t op, const char* str, void* ptr)
 {
-  assert(op == SET);
+  assert(op == VALUE);
 
   char* p = ptr;
   *p = *str;
@@ -116,7 +126,7 @@ format_(op_t op, const char* str, void* ptr)
 {
   (void)str;
   switch (op) {
-    case LIST_APPEND:
+    case LIST:
       dlist_append((dlist_t*)ptr, strdup(str));
       break;
     default:
