@@ -13,21 +13,6 @@
 #include "giti_log.h"
 #include "giti_string.h"
 
-#define STR_TIMEOUT    "general.timeout"
-#define STR_USER_NAME  "general.user_name"
-#define STR_USER_EMAIL "general.user_email"
-#define STR_FRIENDS    "friends"
-#define STR_UP         "keybinding.up"
-#define STR_DOWN       "keybinding.down"
-#define STR_BACK       "keybinding.back"
-#define STR_HELP       "keybinding.help"
-
-#define DEFAULT_TIMEOUT 500
-#define DEFAULT_FRIENDS ""
-#define DEFAULT_UP      'k'
-#define DEFAULT_DOWN    'j'
-#define DEFAULT_BACK    'q'
-#define DEFAULT_HELP    '?'
 
 giti_config_t config;
 
@@ -44,45 +29,57 @@ typedef enum group {
     FRIENDS,
 } group_t;
 
+
+
 #define CONFIG \
-  X(GENERAL,    STR_TIMEOUT,    VALUE, DEFAULT_TIMEOUT, &config.general.timeout)    \
-  X(GENERAL,    STR_USER_NAME,  VALUE, NULL,            &config.general.user_name)  \
-  X(GENERAL,    STR_USER_EMAIL, VALUE, NULL,            &config.general.user_email) \
-  X(KEYBINDING, STR_UP,         VALUE, DEFAULT_UP,      &config.keybinding.up)      \
-  X(KEYBINDING, STR_DOWN,       VALUE, DEFAULT_DOWN,    &config.keybinding.down)    \
-  X(KEYBINDING, STR_BACK,       VALUE, DEFAULT_BACK,    &config.keybinding.back)    \
-  X(KEYBINDING, STR_HELP,       VALUE, DEFAULT_HELP,    &config.keybinding.help)    \
-  X(FRIENDS,    STR_FRIENDS,    LIST,  DEFAULT_FRIENDS, config.friends)             \
+  X(GENERAL,    "general.timeout",         VALUE, 500,  config.general.timeout)         \
+  X(GENERAL,    "general.user_name",       VALUE, NULL, config.general.user_name)       \
+  X(GENERAL,    "general.user_email",      VALUE, NULL, config.general.user_email)      \
+  X(KEYBINDING, "keybinding.up",           VALUE, "k",  config.keybinding.up)           \
+  X(KEYBINDING, "keybinding.down",         VALUE, "j",  config.keybinding.down)         \
+  X(KEYBINDING, "keybinding.back",         VALUE, "q",  config.keybinding.back)         \
+  X(KEYBINDING, "keybinding.help",         VALUE, "?",  config.keybinding.help)         \
+  X(KEYBINDING, "keybinding.log.filter",   VALUE, "s",  config.keybinding.log.filter)   \
+  X(KEYBINDING, "keybinding.log.search",   VALUE, "S",  config.keybinding.log.search)   \
+  X(KEYBINDING, "keybinding.log.my",       VALUE, "m",  config.keybinding.log.my)       \
+  X(KEYBINDING, "keybinding.log.friends",  VALUE, "M",  config.keybinding.log.friends)  \
+  X(KEYBINDING, "keybinding.commit.info",  VALUE, "i",  config.keybinding.commit.info)  \
+  X(KEYBINDING, "keybinding.commit.files", VALUE, "f",  config.keybinding.commit.files) \
+  X(KEYBINDING, "keybinding.commit.show",  VALUE, "d",  config.keybinding.commit.show)  \
+  X(FRIENDS,    "friends",                 LIST,  NULL, config.friends)                 \
 
 size_t
-snprintf_char(char* buf, size_t buf_sz, const char* header, op_t op, void* ptr)
+snprintf_char(char* buf, size_t buf_sz, const char* header, op_t op, char val)
 {
   assert(op == VALUE);
 
-  return snprintf(buf, buf_sz, "%s: %c", header, *(char*)ptr);
+  return snprintf(buf, buf_sz, "%s: %c", header, val);
 }
 
 size_t
-snprintf_long(char* buf, size_t buf_sz, const char* header, op_t op, void* ptr)
+snprintf_long(char* buf, size_t buf_sz, const char* header, op_t op, long val)
 {
   assert(op == VALUE);
 
-  return snprintf(buf, buf_sz, "%s: %lu", header, *(long*)ptr);
+  return snprintf(buf, buf_sz, "%s: %lu", header, val);
 }
 
 size_t
-snprintf_string(char* buf, size_t buf_sz, const char* header, op_t op, void* ptr)
+snprintf_string(char* buf, size_t buf_sz, const char* header, op_t op, char* val)
 {
   assert(op == VALUE);
 
-  return snprintf(buf, buf_sz, "%s: %s", header, *(char**)ptr);
+  return snprintf(buf, buf_sz, "%s: %s", header, val);
 }
 
 size_t
-snprintf_data(char* buf, size_t buf_sz, const char* header, op_t op, void* ptr)
+snprintf_data(char* buf, size_t buf_sz, const char* header, op_t op, void* data)
 {
-  size_t pos = 0;
-  dlist_iterator_t* it = dlist_iterator_create((dlist_t*)ptr);
+  if (!data) {
+    return 0;
+  }
+  size_t            pos = 0;
+  dlist_iterator_t* it  = dlist_iterator_create((dlist_t*)data);
 
   const char* str_friend = NULL;
   while ((str_friend = dlist_iterator_next(it))) {
@@ -94,11 +91,12 @@ snprintf_data(char* buf, size_t buf_sz, const char* header, op_t op, void* ptr)
 }
 
 #define snprintf_param(ptr, buf, buf_sz, header, op) _Generic( (ptr), \
-    char*:   snprintf_char(buf, buf_sz, header, op, ptr),             \
-    long*:   snprintf_long(buf, buf_sz, header, op, ptr),             \
-    char**:  snprintf_string(buf, buf_sz, header, op, ptr),           \
-    default: snprintf_data(buf, buf_sz, header, op, ptr)              \
-)
+    char:    snprintf_char,                                           \
+    int:     snprintf_long,                                           \
+    long:    snprintf_long,                                           \
+    char*:   snprintf_string,                                         \
+    default: snprintf_data                                            \
+) (buf, buf_sz, header, op, ptr)
 
 void
 format_long(op_t op, const char* str, void* ptr)
@@ -143,44 +141,49 @@ format_data(op_t op, const char* str, void* ptr)
 }
 
 #define set_param(ptr, op, str) _Generic( (ptr), \
-    char*:   format_char(op, str, ptr),          \
-    long*:   format_long(op, str, ptr),          \
-    char**:  format_string(op, str, ptr),        \
-    default: format_data(op, str, ptr)           \
-)
+    char*:   format_char,                        \
+    long*:   format_long,                        \
+    char**:  format_string,                      \
+    default: format_data                         \
+) (op, str, ptr)
 
 static char*
 giti_config_default_create()
 {
-    char* str_config = NULL;
-    int len = asprintf(&str_config,
-"# --== GITi Config ==--\n\
-%s: %u                  \n\
-                        \n\
-# Keybinding            \n\
-%-6s: %c                \n\
-%-6s: %c                \n\
-%-6s: %c                \n\
-%-6s: %c                \n\
-                        \n\
-%s: %s",
+  size_t pos        = 0;
+  size_t len        = 2048;
+  char*  str_config = malloc(len);
 
-STR_TIMEOUT,
-DEFAULT_TIMEOUT,
+  group_t last_group = GROUP_INVALID;
+  pos += snprintf(str_config + pos, len - pos, "# --== GITi Config ==--\n");
+#define X(group, str, op, def, ptr)                                  \
+  if (group != last_group) {                                         \
+    switch(group) {                                                  \
+    case GENERAL:                                                    \
+      pos += snprintf(str_config + pos, len - pos, "# -= General =-\n");                                          \
+      break;                                                         \
+    case KEYBINDING:                                                 \
+      pos += snprintf(str_config + pos, len - pos, "\n# -= Keybinding =-\n");                                     \
+      break;                                                         \
+    case FRIENDS:                                                    \
+      pos += snprintf(str_config + pos, len - pos, "\n# -= Friends =-\n");                                        \
+      break;                                                         \
+    default:                                                         \
+      assert(false);                                                 \
+    }                                                                \
+    last_group = group;                                              \
+  }                                                                  \
+                                                                     \
+  pos += snprintf_param(def, str_config + pos, len - pos, str, op);  \
+  pos += snprintf(str_config + pos, len - pos, "\n");                \
 
-STR_UP,
-DEFAULT_UP,
-STR_DOWN,
-DEFAULT_DOWN,
-STR_BACK,
-DEFAULT_BACK,
-STR_HELP,
-DEFAULT_HELP,
+  CONFIG
+#undef X
 
-STR_FRIENDS,
-DEFAULT_FRIENDS);
 
-    return len > 0 ? str_config : NULL;
+  log("XXXXX\n%s", str_config);
+
+  return str_config;
 }
 
 char*
@@ -213,7 +216,7 @@ giti_config_line(const char* line)
 
 #define X(group, str, op, def, ptr)              \
     if (strncmp(str, line, strlen(str)) == 0) {  \
-      set_param(ptr, op, value);                 \
+      set_param(&ptr, op, value);                \
     }
 
     CONFIG
@@ -236,7 +239,7 @@ giti_config_create(char* str_config, const char* user_name, const char* user_ema
             nextLine += 1;
         }
 
-        if (*curline == '#' || isspace(*curline)) {
+          if (*curline == '#' || isspace(*curline) || strlen(curline) == 0) {
             goto next;
         }
 

@@ -734,7 +734,8 @@ static void
 giti_commit_diff(const giti_commit_t* c)
 {
     char buf[100];
-    snprintf(buf, sizeof(buf), "git diff %s^!", c->h); /* show changes in specific commit */
+    snprintf(buf, sizeof(buf), "git diff --color=always %s^! | less -r", c->h); /* show changes in specific commit */
+    log("[%s] cmd: %s", __func__, buf);
     system(buf);
 }
 
@@ -830,28 +831,25 @@ giti_commit_action(void* c_, uint32_t action_id, giti_window_opt_t* opt)
     giti_commit_t* c = c_;
 
     bool claimed = true;
-    switch (action_id) {
-    case 'i': {
+    if (action_id == (uint32_t)g_config->keybinding.commit.info) {
         opt->text = giti_commit_info(c);
         opt->type = S_ITEM_TYPE_TEXT;
         opt->cb_title = giti_commit_info_title_str;
         opt->cb_arg = c;
         opt->xmax = -1;
-        break;
     }
-    case 'd':
+    else if (action_id == (uint32_t)g_config->keybinding.commit.show) {
         giti_commit_diff(c);
-        break;
-    case 'f': {
+    }
+    else if (action_id == (uint32_t)g_config->keybinding.commit.files) {
         opt->text = giti_commit_files(c);
         opt->type = S_ITEM_TYPE_TEXT;
         opt->cb_title = giti_commit_files_title_str;
         opt->cb_filter = giti_commit_files_color_filter;
         opt->cb_arg = c;
         opt->xmax = -1;
-        break;
     }
-    case ' ': {
+    else if (action_id == ' ') {
         giti_window_menu_t* gwm = giti_window_menu_create();
         opt->type = S_ITEM_TYPE_MENU;
         opt->menu = gwm->menu;
@@ -886,11 +884,9 @@ giti_commit_action(void* c_, uint32_t action_id, giti_window_opt_t* opt)
         item->action_id = 'f';
         strncpy(item->name, "Show files in commit   [f]", sizeof(item->name));
         dlist_append(gwm->menu, item);
-        break;
     }
-    default:
+    else {
         claimed = false;
-        break;
     }
 
     return claimed;
@@ -1083,19 +1079,19 @@ giti_log_shortcut(void* gl_, wint_t wch, uint32_t action_id, giti_window_opt_t* 
         }
     }
     else {
-        if (wch == 'm') {
+        if (wch == (wint_t)g_config->keybinding.log.my) {
             gl->filter.self = !gl->filter.self;
         }
-        else if (wch == 'M') {
+        else if (wch == (wint_t)g_config->keybinding.log.friends) {
             gl->filter.friends = !gl->filter.friends;
         }
-        else if (wch == 's') {
+        else if (wch == (wint_t)g_config->keybinding.log.search) {
             gl->filter.active = true;
             gl->filter.show_all = false;
             gl->filter.str_pos = 0;
             memset(gl->filter.str, 0, sizeof(gl->filter.str));
         }
-        else if (wch == 'S') {
+        else if (wch == (wint_t)g_config->keybinding.log.filter) {
             gl->filter.active = true;
             gl->filter.show_all = true;
             gl->filter.str_pos = 0;

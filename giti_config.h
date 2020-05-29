@@ -14,6 +14,17 @@ typedef struct giti_config {
     char down;
     char back;
     char help;
+    struct {
+      char filter;
+      char search;
+      char my;
+      char friends;
+    } log;
+    struct {
+      char info;
+      char files;
+      char show;
+    } commit;
   } keybinding;
   dlist_t* friends;
 } giti_config_t;
