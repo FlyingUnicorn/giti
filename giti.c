@@ -1608,13 +1608,15 @@ giti_summary_create(const char* branch)
 
     size_t pos = 0;
     pos += snprintf(gs->text + pos, sizeof(gs->text) - pos, "Hello %s (%s)\n", g_config->general.user_name, g_config->general.user_email);
-    pos += snprintf(gs->text + pos, sizeof(gs->text) - pos, "On Branch <giti-clr-1>%s<giti-clr-end>", gs->branch);
-    if (strlen(gb->upstream)) {
-        pos += snprintf(gs->text + pos, sizeof(gs->text) - pos, " upstream: <giti-clr-2>%s<giti-clr-end>", gb->upstream);
+    if (gb) {
+        pos += snprintf(gs->text + pos, sizeof(gs->text) - pos, "On Branch <giti-clr-1>%s<giti-clr-end>", gs->branch);
+        if (strlen(gb->upstream)) {
+            pos += snprintf(gs->text + pos, sizeof(gs->text) - pos, " upstream: <giti-clr-2>%s<giti-clr-end>", gb->upstream);
+        }
     }
     pos += snprintf(gs->text + pos, sizeof(gs->text) - pos, "\n\n");
 
-    if (dlist_size(gb->commits)) {
+    if (gb && dlist_size(gb->commits)) {
         pos += snprintf(gs->text + pos, sizeof(gs->text) - pos, "Commits relative to upstream\n");
 
         giti_commit_t* c = NULL;
