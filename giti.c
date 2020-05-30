@@ -1517,7 +1517,7 @@ giti_summary_action(void* gs_, uint32_t action_id, giti_window_opt_t* opt)
 
     bool claimed = true;
     if (action_id == g_config->keybinding.logs) {
-        *opt = giti_log_create(gs->branch, 100000);
+        *opt = giti_log_create(gs->branch, 50000);
     }
     else if (action_id == g_config->keybinding.branches) {
         *opt = giti_branches_create(gs->branch, gs->branches);
@@ -1863,6 +1863,7 @@ giti_window_stack_create(giti_window_opt_t opt)
  * config
  *  - clenaup memory
  *  - create config
+ * add option to fetch more log entries
  */
 
 /* MAIN */
@@ -1940,17 +1941,25 @@ main()
                     goto exit;
                 }
             }
-            else if (wch == KEY_UP || wch == g_config->keybinding.up) {
-                tw->pos = MAX(0, tw->pos - 1);
+            else if (wch == KEY_UP ||
+                     wch == g_config->keybinding.up ||
+                     wch == KEY_PPAGE ||
+                     wch == g_config->keybinding.up_page) {
+
+                int i = 1;
+                i = wch == KEY_PPAGE ? 15 : i;
+                i = wch == g_config->keybinding.up_page ? tw->ymax - 2 : i;
+                tw->pos = MAX(0, tw->pos - i);
             }
-            else if (wch == KEY_DOWN || wch == g_config->keybinding.down) {
-                tw->pos = MIN(giti_window_posmax(tw), tw->pos + 1);
-            }
-            else if (wch == KEY_PPAGE) {
-                tw->pos = MAX(0, tw->pos - 15);
-            }
-            else if (wch == KEY_NPAGE) {
-                tw->pos = MIN(giti_window_posmax(tw), tw->pos + 15);
+            else if (wch == KEY_DOWN ||
+                     wch == g_config->keybinding.down ||
+                     wch == KEY_NPAGE ||
+                     wch == g_config->keybinding.down_page) {
+
+                int i = 1;
+                i = wch == KEY_NPAGE ? 15 : i;
+                i = wch == g_config->keybinding.down_page ? tw->ymax - 2 : i;
+                tw->pos = MIN(giti_window_posmax(tw), tw->pos + i);
             }
         }
 

@@ -17,6 +17,8 @@ typedef struct giti_config {
   struct {
     uint32_t          up;
     uint32_t          down;
+    uint32_t          up_page;
+    uint32_t          down_page;
     uint32_t          back;
     uint32_t          help;
     uint32_t          logs;

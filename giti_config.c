@@ -35,8 +35,10 @@ typedef enum group {
   X(GENERAL,    "general.timeout",          VALUE,     (uint32_t)500,       config.general.timeout)          \
   X(GENERAL,    "general.user_name",        VALUE,     NULL,                config.general.user_name)        \
   X(GENERAL,    "general.user_email",       VALUE,     NULL,                config.general.user_email)       \
-  X(KEYBINDING, "keybinding.up",            KEY,       "k",                 config.keybinding.up)            \
-  X(KEYBINDING, "keybinding.down",          KEY,       "j",                 config.keybinding.down)          \
+  X(KEYBINDING, "keybinding.upx",           KEY,       "k",                 config.keybinding.up)            \
+  X(KEYBINDING, "keybinding.downx",         KEY,       "j",                 config.keybinding.down)          \
+  X(KEYBINDING, "keybinding.up_page",       KEY,       "META+k",            config.keybinding.up_page)       \
+  X(KEYBINDING, "keybinding.down_page",     KEY,       "META+j",            config.keybinding.down_page)     \
   X(KEYBINDING, "keybinding.back",          KEY,       "q",                 config.keybinding.back)          \
   X(KEYBINDING, "keybinding.help",          KEY,       "?",                 config.keybinding.help)          \
   X(KEYBINDING, "keybinding.logs",          KEY,       "l",                 config.keybinding.logs)          \
@@ -261,30 +263,30 @@ giti_config_line(const char* line)
 giti_config_t*
 giti_config_create(char* str_config, const char* user_name, const char* user_email)
 {
-   config.friends               = dlist_create(); // todo fix this
-   config.general.user_name     = strdup(user_name);
-   config.general.user_email    = strdup(user_email);
-   config.format.max_width_name = 20;
+  config.friends               = dlist_create(); // todo fix this
+  config.general.user_name     = strdup(user_name);
+  config.general.user_email    = strdup(user_email);
+  config.format.max_width_name = 20;
 
-    str_config = str_config ? str_config : giti_config_default_create();
-    char* curline = str_config;
-    while(curline) {
-        char* nextLine = strchr(curline, '\n');
-        if (nextLine) {
-            *nextLine = '\0';
-            nextLine += 1;
-        }
-
-          if (*curline == '#' || isspace(*curline) || strlen(curline) == 0) {
-            goto next;
-        }
-
-        giti_config_line(curline);
-next:
-        curline = nextLine;
+  str_config = str_config ? str_config : giti_config_default_create();
+  char* curline = str_config;
+  while(curline) {
+    char* nextLine = strchr(curline, '\n');
+    if (nextLine) {
+      *nextLine = '\0';
+      nextLine += 1;
     }
 
-    return &config;
+    if (*curline == '#' || isspace(*curline) || strlen(curline) == 0) {
+      goto next;
+    }
+    giti_config_line(curline);
+
+next:
+    curline = nextLine;
+  }
+
+  return &config;
 }
 
 char*
