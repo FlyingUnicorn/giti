@@ -4,31 +4,33 @@
 #include <stdint.h>
 
 #include "dlist.h"
+#include "giti_color.h"
 
 typedef struct giti_config {
   struct {
-    char* user_name;
-    char* user_email;
-    long  timeout;
+    char*             user_name;
+    char*             user_email;
+    uint32_t          timeout;
   } general;
   struct {
-    uint32_t up;
-    uint32_t down;
-    uint32_t back;
-    uint32_t help;
+    uint32_t          up;
+    uint32_t          down;
+    uint32_t          back;
+    uint32_t          help;
     struct {
-      uint32_t filter;
-      uint32_t highlight;
-      uint32_t my;
-      uint32_t friends;
+      uint32_t        filter;
+      uint32_t        highlight;
+      uint32_t        my;
+      uint32_t        friends;
     } log;
     struct {
-      uint32_t info;
-      uint32_t files;
-      uint32_t show;
+      uint32_t        info;
+      uint32_t        files;
+      uint32_t        show;
     } commit;
   } keybinding;
-  dlist_t* friends;
+  dlist_t*            friends;
+  giti_color_scheme_t color;
 } giti_config_t;
 
 

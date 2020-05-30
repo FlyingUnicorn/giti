@@ -20,6 +20,7 @@ typedef enum op {
     VALUE,
     LIST,
     KEY,
+    COLOR_CODE,
 } op_t;
 
 typedef enum group {
@@ -27,83 +28,92 @@ typedef enum group {
     GENERAL,
     KEYBINDING,
     FRIENDS,
+    COLOR,
 } group_t;
 
-#define CONFIG \
-  X(GENERAL,    "general.timeout",          VALUE, 500,  config.general.timeout)          \
-  X(GENERAL,    "general.user_name",        VALUE, NULL, config.general.user_name)        \
-  X(GENERAL,    "general.user_email",       VALUE, NULL, config.general.user_email)       \
-  X(KEYBINDING, "keybinding.up",            KEY,   "k",  config.keybinding.up)            \
-  X(KEYBINDING, "keybinding.down",          KEY,   "j",  config.keybinding.down)          \
-  X(KEYBINDING, "keybinding.back",          KEY,   "q",  config.keybinding.back)          \
-  X(KEYBINDING, "keybinding.help",          KEY,   "?",  config.keybinding.help)          \
-  X(KEYBINDING, "keybinding.log.filter",    KEY,   "s",  config.keybinding.log.filter)    \
-  X(KEYBINDING, "keybinding.log.highlight", KEY,   "S",  config.keybinding.log.highlight) \
-  X(KEYBINDING, "keybinding.log.my",        KEY,   "m",  config.keybinding.log.my)        \
-  X(KEYBINDING, "keybinding.log.friends",   KEY,   "M",  config.keybinding.log.friends)   \
-  X(KEYBINDING, "keybinding.commit.info",   KEY,   "i",  config.keybinding.commit.info)   \
-  X(KEYBINDING, "keybinding.commit.files",  KEY,   "f",  config.keybinding.commit.files)  \
-  X(KEYBINDING, "keybinding.commit.show",   KEY,   "d",  config.keybinding.commit.show)   \
-  X(FRIENDS,    "friends",                  LIST,  NULL, config.friends)                  \
+#define CONFIG                                                                                               \
+  X(GENERAL,    "general.timeout",          VALUE,     (uint32_t)500,       config.general.timeout)          \
+  X(GENERAL,    "general.user_name",        VALUE,     NULL,                config.general.user_name)        \
+  X(GENERAL,    "general.user_email",       VALUE,     NULL,                config.general.user_email)       \
+  X(KEYBINDING, "keybinding.up",            KEY,       "k",                 config.keybinding.up)            \
+  X(KEYBINDING, "keybinding.down",          KEY,       "j",                 config.keybinding.down)          \
+  X(KEYBINDING, "keybinding.back",          KEY,       "q",                 config.keybinding.back)          \
+  X(KEYBINDING, "keybinding.help",          KEY,       "?",                 config.keybinding.help)          \
+  X(KEYBINDING, "keybinding.log.filter",    KEY,       "s",                 config.keybinding.log.filter)    \
+  X(KEYBINDING, "keybinding.log.highlight", KEY,       "S",                 config.keybinding.log.highlight) \
+  X(KEYBINDING, "keybinding.log.my",        KEY,       "m",                 config.keybinding.log.my)        \
+  X(KEYBINDING, "keybinding.log.friends",   KEY,       "M",                 config.keybinding.log.friends)   \
+  X(KEYBINDING, "keybinding.commit.info",   KEY,       "i",                 config.keybinding.commit.info)   \
+  X(KEYBINDING, "keybinding.commit.files",  KEY,       "f",                 config.keybinding.commit.files)  \
+  X(KEYBINDING, "keybinding.commit.show",   KEY,       "d",                 config.keybinding.commit.show)   \
+  X(FRIENDS,    "friends",                  LIST,       NULL,               config.friends)                  \
+  X(COLOR,      "color.fgm",                COLOR_CODE, (uint32_t)0xD1F2EB, config.color.fg.c)               \
+  X(COLOR,      "color.bgm",                COLOR_CODE, (uint32_t)0x000000, config.color.bg.c)               \
+  X(COLOR,      "color.bg_selected",        COLOR_CODE, (uint32_t)0x4FC3F7, config.color.bg_selected.c)      \
+  X(COLOR,      "color.fg1",                COLOR_CODE, (uint32_t)0xFFAB91, config.color.fg1.c)              \
+  X(COLOR,      "color.fg2",                COLOR_CODE, (uint32_t)0x148686, config.color.fg2.c)              \
+  X(COLOR,      "color.fg3",                COLOR_CODE, (uint32_t)0x6c648b, config.color.fg3.c)              \
+  X(COLOR,      "color.on",                 COLOR_CODE, (uint32_t)0x00FF00, config.color.on.c)               \
+  X(COLOR,      "color.off",                COLOR_CODE, (uint32_t)0xFF0000, config.color.off.c)              \
+  X(COLOR,      "color.inactive",           COLOR_CODE, (uint32_t)0x78909C, config.color.inactive.c)         \
+
 
 size_t
-snprintf_char(char* buf, size_t buf_sz, const char* header, op_t op, char val)
+snprintf_uint(char* buf, size_t buf_sz, int pad, const char* header, op_t op, unsigned int val)
 {
-  assert(op == VALUE);
-
-  return snprintf(buf, buf_sz, "%s: %c", header, val);
+  size_t written = 0;
+  switch (op) {
+    case VALUE:
+    case KEY:
+      written = snprintf(buf, buf_sz, "%s:", header);
+      written += snprintf(buf += written, buf_sz - written, "%*s%u", (int)(pad-written), "", val);
+      break;
+    case COLOR_CODE:
+      written = snprintf(buf, buf_sz, "%s:", header);
+      written += snprintf(buf += written, buf_sz - written, "%*s0x%06x", (int)(pad-written), "", val);
+      break;
+    default:
+      abort();
+  }
+  return written;
 }
 
 size_t
-snprintf_long(char* buf, size_t buf_sz, const char* header, op_t op, long val)
-{
-  assert(op == VALUE);
-
-  return snprintf(buf, buf_sz, "%s: %ld", header, val);
-}
-
-size_t
-snprintf_uint(char* buf, size_t buf_sz, const char* header, op_t op, unsigned int val)
+snprintf_string(char* buf, size_t buf_sz, int pad, const char* header, op_t op, char* val)
 {
   assert(op == VALUE || op == KEY);
 
-  return snprintf(buf, buf_sz, "%s: %u", header, val);
+  size_t written = 0;
+  written = snprintf(buf, buf_sz, "%s:", header);
+  written += snprintf(buf += written, buf_sz - written, "%*s%s", (int)(pad-written), "", val);
+
+  return written;
 }
 
 size_t
-snprintf_string(char* buf, size_t buf_sz, const char* header, op_t op, char* val)
-{
-  assert(op == VALUE || op == KEY);
-
-  return snprintf(buf, buf_sz, "%s: %s", header, val);
-}
-
-size_t
-snprintf_data(char* buf, size_t buf_sz, const char* header, op_t op, void* data)
+snprintf_data(char* buf, size_t buf_sz, int pad, const char* header, op_t op, void* data)
 {
   if (!data) {
     return 0;
   }
-  size_t            pos = 0;
-  dlist_iterator_t* it  = dlist_iterator_create((dlist_t*)data);
+  size_t            written = 0;
+  dlist_iterator_t* it      = dlist_iterator_create((dlist_t*)data);
 
   const char* str_friend = NULL;
   while ((str_friend = dlist_iterator_next(it))) {
-    pos += snprintf(buf + pos, buf_sz - pos, "%s: %s\n", header, str_friend);
+    written = snprintf(buf, buf_sz, "%s:", header);
+    written += snprintf(buf += written, buf_sz - written, "%*s%s\n", (int)(pad-written), "", str_friend);
   }
   dlist_iterator_destroy(it);
 
-  return pos;
+  return written;
 }
 
-#define snprintf_param(ptr, buf, buf_sz, header, op) _Generic( (ptr), \
-    char:         snprintf_char,                                      \
-    int:          snprintf_long,                                      \
-    unsigned int: snprintf_uint,                                      \
-    long:         snprintf_long,                                      \
-    char*:        snprintf_string,                                    \
-    default:      snprintf_data                                       \
-) (buf, buf_sz, header, op, ptr)
+#define snprintf_param(ptr, buf, buf_sz, pad, header, op) _Generic( (ptr), \
+    unsigned int: snprintf_uint,                                           \
+    char*:        snprintf_string,                                         \
+    default:      snprintf_data                                            \
+) (buf, buf_sz, pad, header, op, ptr)
 
 void
 format_uint(op_t op, const char* str, void* ptr)
@@ -113,23 +123,17 @@ format_uint(op_t op, const char* str, void* ptr)
     case VALUE:
       *p = strtoul(str, NULL, 10);
       break;
+    case COLOR_CODE:
+      *p = strtoul(str, NULL, 16);
+      break;
     case KEY:
       *p = str[0];
-      log_debug("str: %s val: %u", str, *p);
       break;
     default:
       abort();
   }
 }
 
-void
-format_long(op_t op, const char* str, void* ptr)
-{
-  assert(op == VALUE);
-
-  long* p = ptr;
-  *p = atol(str);
-}
 
 void
 format_string(op_t op, const char* str, void* ptr)
@@ -157,7 +161,6 @@ format_data(op_t op, const char* str, void* ptr)
 
 #define set_param(ptr, op, str) _Generic( (ptr), \
     unsigned int*: format_uint,                  \
-    long*:         format_long,                  \
     char**:        format_string,                \
     default:       format_data                   \
 ) (op, str, ptr)
@@ -166,31 +169,35 @@ static char*
 giti_config_default_create()
 {
   size_t pos        = 0;
-  size_t len        = 2048;
+  size_t len        = 4096;
   char*  str_config = malloc(len);
 
   group_t last_group = GROUP_INVALID;
   pos += snprintf(str_config + pos, len - pos, "# --== GITi Config ==--\n");
-#define X(group, str, op, def, ptr)                                           \
-  if (group != last_group) {                                                  \
-    switch(group) {                                                           \
-    case GENERAL:                                                             \
-      pos += snprintf(str_config + pos, len - pos, "# -= General =-\n");      \
-      break;                                                                  \
-    case KEYBINDING:                                                          \
-      pos += snprintf(str_config + pos, len - pos, "\n# -= Keybinding =-\n"); \
-      break;                                                                  \
-    case FRIENDS:                                                             \
-      pos += snprintf(str_config + pos, len - pos, "\n# -= Friends =-\n");    \
-      break;                                                                  \
-    default:                                                                  \
-      assert(false);                                                          \
-    }                                                                         \
-    last_group = group;                                                       \
-  }                                                                           \
-                                                                              \
-  pos += snprintf_param(def, str_config + pos, len - pos, str, op);           \
-  pos += snprintf(str_config + pos, len - pos, "\n");                         \
+#define X(group, str, op, def, ptr)                                             \
+  if (group != last_group) {                                                    \
+    switch(group) {                                                             \
+    case GENERAL:                                                               \
+      pos += snprintf(str_config + pos, len - pos, "# -= General =-\n");        \
+      break;                                                                    \
+    case KEYBINDING:                                                            \
+      pos += snprintf(str_config + pos, len - pos, "\n# -= Keybinding =-\n");   \
+      break;                                                                    \
+    case FRIENDS:                                                               \
+      pos += snprintf(str_config + pos, len - pos, "\n# -= Friends =-\n");      \
+      break;                                                                    \
+    case COLOR:                                                                 \
+      pos += snprintf(str_config + pos, len - pos, "\n# -= Color Scheme =-\n"); \
+      break;                                                                    \
+    default:                                                                    \
+      log("unknown group: %u", group);                                          \
+      assert(false);                                                            \
+    }                                                                           \
+    last_group = group;                                                         \
+  }                                                                             \
+                                                                                \
+  pos += snprintf_param(def, str_config + pos, len - pos, 26, str, op);         \
+  pos += snprintf(str_config + pos, len - pos, "\n");                           \
 
   CONFIG
 #undef X
@@ -272,26 +279,30 @@ giti_config_to_string(const giti_config_t* config_)
 
   group_t last_group = GROUP_INVALID;
   log("--== GITi Config ==--");
-#define X(group, header, op, def, ptr)                                              \
-  if (group != last_group) {                                                        \
-    switch(group) {                                                                 \
-    case GENERAL:                                                                   \
-      written += snprintf(str + written, buf_sz - written, "-= General =-\n");      \
-      break;                                                                        \
-    case KEYBINDING:                                                                \
-      written += snprintf(str + written, buf_sz - written, "\n-= Keybinding =-\n"); \
-      break;                                                                        \
-    case FRIENDS:                                                                   \
-      written += snprintf(str + written, buf_sz - written, "\n-= Friends =-\n");    \
-      break;                                                                        \
-    default:                                                                        \
-      assert(false);                                                                \
-    }                                                                               \
-    last_group = group;                                                             \
-  }                                                                                 \
-                                                                                    \
-  written += snprintf_param(ptr, str + written, buf_sz - written, header, op);      \
-  written += snprintf(str + written, buf_sz - written, "\n");                       \
+#define X(group, header, op, def, ptr)                                                 \
+  if (group != last_group) {                                                           \
+    switch(group) {                                                                    \
+    case GENERAL:                                                                      \
+      written += snprintf(str + written, buf_sz - written, "-= General =-\n");         \
+      break;                                                                           \
+    case KEYBINDING:                                                                   \
+      written += snprintf(str + written, buf_sz - written, "\n-= Keybinding =-\n");    \
+      break;                                                                           \
+    case FRIENDS:                                                                      \
+      written += snprintf(str + written, buf_sz - written, "\n-= Friends =-\n");       \
+      break;                                                                           \
+    case COLOR:                                                                        \
+      written += snprintf(str + written, buf_sz - written, "\n -= Color Scheme =-\n"); \
+      break;                                                                           \
+    default:                                                                           \
+      log("unknown group: %u", group);                                                 \
+      assert(false);                                                                   \
+    }                                                                                  \
+    last_group = group;                                                                \
+  }                                                                                    \
+                                                                                       \
+  written += snprintf_param(ptr, str + written, buf_sz - written, 26, header, op);     \
+  written += snprintf(str + written, buf_sz - written, "\n");                          \
 
   CONFIG
 #undef X

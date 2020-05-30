@@ -18,6 +18,7 @@
 
 #include "dlist.h"
 
+#include "giti_color.h"
 #include "giti_config.h"
 #include "giti_log.h"
 #include "giti_string.h"
@@ -53,17 +54,6 @@ typedef enum s_item_type {
     S_ITEM_TYPE_ACTION,
     S_ITEM_TYPE_TEXT,
 } s_item_type_t;
-
-typedef struct giti_color {
-    union {
-        struct {
-            uint8_t g;
-            uint8_t b;
-            uint8_t r;
-        };
-        uint32_t c;
-    };
-} giti_color_t;
 
 typedef struct giti_window_opt {
     s_item_type_t            type;
@@ -140,18 +130,6 @@ strlen_formatted(const char* str)
 }
 
 /* HELPER FUNCTIONS GITI */
-typedef struct giti_color_scheme {
-    giti_color_t fg;
-    giti_color_t bg;
-    giti_color_t bg_selected;
-    giti_color_t fg1;
-    giti_color_t fg2;
-    giti_color_t fg3;
-    giti_color_t on;
-    giti_color_t off;
-    giti_color_t inactive;
-} giti_color_scheme_t;
-
 static short
 convclr(short c)
 {
@@ -1897,33 +1875,8 @@ main()
 
     giti_window_opt_t opt = giti_summary_create(current_branch);
     giti_window_stack_t* gws = giti_window_stack_create(opt);
-#if 1
     //https://htmlcolorcodes.com/color-chart/
-    giti_color_scheme_t cs = {
-        .fg          = (giti_color_t){ .c = 0xD1F2EB },
-        .bg          = (giti_color_t){ .c = 0x000000 },
-        .bg_selected = (giti_color_t){ .c = 0x4FC3F7 },
-        .fg1         = (giti_color_t){ .c = 0xFFAB91 },
-        .fg2         = (giti_color_t){ .c = 0x148686 },
-        .fg3         = (giti_color_t){ .c = 0x6c648b },
-        .on          = (giti_color_t){ .c = 0x00FF00 },
-        .off         = (giti_color_t){ .c = 0xFF0000 },
-        .inactive    = (giti_color_t){ .c = 0x78909C },
-    };
-#else
-    giti_color_scheme_t cs = {
-        .fg          = (giti_color_t){ .c = 0xccdfcb },
-        .bg          = (giti_color_t){ .c = 0x000000 },
-        .bg_selected = (giti_color_t){ .c = 0x056571 },
-        .fg1         = (giti_color_t){ .c = 0xff6a5c },
-        .fg2         = (giti_color_t){ .c = 0x99ced4 },
-        .fg3         = (giti_color_t){ .c = 0xdcc7aa },
-        .active      = (giti_color_t){ .c = 0x8fc33a },
-        .inactive    = (giti_color_t){ .c = 0xf53240 },
-    };
-#endif
-
-    giti_color_scheme_init(&cs);
+    giti_color_scheme_init(&g_config->color);
 
     uint32_t wch;
     while (true) {
