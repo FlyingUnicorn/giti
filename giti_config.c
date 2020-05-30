@@ -13,13 +13,13 @@
 #include "giti_log.h"
 #include "giti_string.h"
 
-
 giti_config_t config;
 
 typedef enum op {
     OP_INVALID,
     VALUE,
     LIST,
+    KEY,
 } op_t;
 
 typedef enum group {
@@ -29,23 +29,21 @@ typedef enum group {
     FRIENDS,
 } group_t;
 
-
-
 #define CONFIG \
   X(GENERAL,    "general.timeout",          VALUE, 500,  config.general.timeout)          \
   X(GENERAL,    "general.user_name",        VALUE, NULL, config.general.user_name)        \
   X(GENERAL,    "general.user_email",       VALUE, NULL, config.general.user_email)       \
-  X(KEYBINDING, "keybinding.up",            VALUE, "k",  config.keybinding.up)            \
-  X(KEYBINDING, "keybinding.down",          VALUE, "j",  config.keybinding.down)          \
-  X(KEYBINDING, "keybinding.back",          VALUE, "q",  config.keybinding.back)          \
-  X(KEYBINDING, "keybinding.help",          VALUE, "?",  config.keybinding.help)          \
-  X(KEYBINDING, "keybinding.log.filter",    VALUE, "s",  config.keybinding.log.filter)    \
-  X(KEYBINDING, "keybinding.log.highlight", VALUE, "S",  config.keybinding.log.highlight) \
-  X(KEYBINDING, "keybinding.log.my",        VALUE, "m",  config.keybinding.log.my)        \
-  X(KEYBINDING, "keybinding.log.friends",   VALUE, "M",  config.keybinding.log.friends)   \
-  X(KEYBINDING, "keybinding.commit.info",   VALUE, "i",  config.keybinding.commit.info)   \
-  X(KEYBINDING, "keybinding.commit.files",  VALUE, "f",  config.keybinding.commit.files)  \
-  X(KEYBINDING, "keybinding.commit.show",   VALUE, "d",  config.keybinding.commit.show)   \
+  X(KEYBINDING, "keybinding.up",            KEY,   "k",  config.keybinding.up)            \
+  X(KEYBINDING, "keybinding.down",          KEY,   "j",  config.keybinding.down)          \
+  X(KEYBINDING, "keybinding.back",          KEY,   "q",  config.keybinding.back)          \
+  X(KEYBINDING, "keybinding.help",          KEY,   "?",  config.keybinding.help)          \
+  X(KEYBINDING, "keybinding.log.filter",    KEY,   "s",  config.keybinding.log.filter)    \
+  X(KEYBINDING, "keybinding.log.highlight", KEY,   "S",  config.keybinding.log.highlight) \
+  X(KEYBINDING, "keybinding.log.my",        KEY,   "m",  config.keybinding.log.my)        \
+  X(KEYBINDING, "keybinding.log.friends",   KEY,   "M",  config.keybinding.log.friends)   \
+  X(KEYBINDING, "keybinding.commit.info",   KEY,   "i",  config.keybinding.commit.info)   \
+  X(KEYBINDING, "keybinding.commit.files",  KEY,   "f",  config.keybinding.commit.files)  \
+  X(KEYBINDING, "keybinding.commit.show",   KEY,   "d",  config.keybinding.commit.show)   \
   X(FRIENDS,    "friends",                  LIST,  NULL, config.friends)                  \
 
 size_t
@@ -61,13 +59,21 @@ snprintf_long(char* buf, size_t buf_sz, const char* header, op_t op, long val)
 {
   assert(op == VALUE);
 
-  return snprintf(buf, buf_sz, "%s: %lu", header, val);
+  return snprintf(buf, buf_sz, "%s: %ld", header, val);
+}
+
+size_t
+snprintf_uint(char* buf, size_t buf_sz, const char* header, op_t op, unsigned int val)
+{
+  assert(op == VALUE || op == KEY);
+
+  return snprintf(buf, buf_sz, "%s: %u", header, val);
 }
 
 size_t
 snprintf_string(char* buf, size_t buf_sz, const char* header, op_t op, char* val)
 {
-  assert(op == VALUE);
+  assert(op == VALUE || op == KEY);
 
   return snprintf(buf, buf_sz, "%s: %s", header, val);
 }
@@ -91,12 +97,30 @@ snprintf_data(char* buf, size_t buf_sz, const char* header, op_t op, void* data)
 }
 
 #define snprintf_param(ptr, buf, buf_sz, header, op) _Generic( (ptr), \
-    char:    snprintf_char,                                           \
-    int:     snprintf_long,                                           \
-    long:    snprintf_long,                                           \
-    char*:   snprintf_string,                                         \
-    default: snprintf_data                                            \
+    char:         snprintf_char,                                      \
+    int:          snprintf_long,                                      \
+    unsigned int: snprintf_uint,                                      \
+    long:         snprintf_long,                                      \
+    char*:        snprintf_string,                                    \
+    default:      snprintf_data                                       \
 ) (buf, buf_sz, header, op, ptr)
+
+void
+format_uint(op_t op, const char* str, void* ptr)
+{
+  unsigned int* p = ptr;
+  switch (op) {
+    case VALUE:
+      *p = strtoul(str, NULL, 10);
+      break;
+    case KEY:
+      *p = str[0];
+      log_debug("str: %s val: %u", str, *p);
+      break;
+    default:
+      abort();
+  }
+}
 
 void
 format_long(op_t op, const char* str, void* ptr)
@@ -105,15 +129,6 @@ format_long(op_t op, const char* str, void* ptr)
 
   long* p = ptr;
   *p = atol(str);
-}
-
-void
-format_char(op_t op, const char* str, void* ptr)
-{
-  assert(op == VALUE);
-
-  char* p = ptr;
-  *p = *str;
 }
 
 void
@@ -141,10 +156,10 @@ format_data(op_t op, const char* str, void* ptr)
 }
 
 #define set_param(ptr, op, str) _Generic( (ptr), \
-    char*:   format_char,                        \
-    long*:   format_long,                        \
-    char**:  format_string,                      \
-    default: format_data                         \
+    unsigned int*: format_uint,                  \
+    long*:         format_long,                  \
+    char**:        format_string,                \
+    default:       format_data                   \
 ) (op, str, ptr)
 
 static char*
@@ -156,32 +171,29 @@ giti_config_default_create()
 
   group_t last_group = GROUP_INVALID;
   pos += snprintf(str_config + pos, len - pos, "# --== GITi Config ==--\n");
-#define X(group, str, op, def, ptr)                                  \
-  if (group != last_group) {                                         \
-    switch(group) {                                                  \
-    case GENERAL:                                                    \
-      pos += snprintf(str_config + pos, len - pos, "# -= General =-\n");                                          \
-      break;                                                         \
-    case KEYBINDING:                                                 \
-      pos += snprintf(str_config + pos, len - pos, "\n# -= Keybinding =-\n");                                     \
-      break;                                                         \
-    case FRIENDS:                                                    \
-      pos += snprintf(str_config + pos, len - pos, "\n# -= Friends =-\n");                                        \
-      break;                                                         \
-    default:                                                         \
-      assert(false);                                                 \
-    }                                                                \
-    last_group = group;                                              \
-  }                                                                  \
-                                                                     \
-  pos += snprintf_param(def, str_config + pos, len - pos, str, op);  \
-  pos += snprintf(str_config + pos, len - pos, "\n");                \
+#define X(group, str, op, def, ptr)                                           \
+  if (group != last_group) {                                                  \
+    switch(group) {                                                           \
+    case GENERAL:                                                             \
+      pos += snprintf(str_config + pos, len - pos, "# -= General =-\n");      \
+      break;                                                                  \
+    case KEYBINDING:                                                          \
+      pos += snprintf(str_config + pos, len - pos, "\n# -= Keybinding =-\n"); \
+      break;                                                                  \
+    case FRIENDS:                                                             \
+      pos += snprintf(str_config + pos, len - pos, "\n# -= Friends =-\n");    \
+      break;                                                                  \
+    default:                                                                  \
+      assert(false);                                                          \
+    }                                                                         \
+    last_group = group;                                                       \
+  }                                                                           \
+                                                                              \
+  pos += snprintf_param(def, str_config + pos, len - pos, str, op);           \
+  pos += snprintf(str_config + pos, len - pos, "\n");                         \
 
   CONFIG
 #undef X
-
-
-  log("XXXXX\n%s", str_config);
 
   return str_config;
 }
@@ -195,8 +207,6 @@ giti_config_get_value(const char* str) {
 
    return strtrimall(str_value);
 }
-
-
 
 void
 giti_config_line(const char* line)
@@ -251,47 +261,12 @@ next:
     return &config;
 }
 
-void
-giti_config_print(const giti_config_t* config_)
-{
-  (void)config_;
-
-  char pos = 0;
-  char buffer[512];
-
-  group_t last_group = GROUP_INVALID;
-  log("--== GITi Config ==--");
-#define X(group, str, op, def, ptr)                                  \
-  if (group != last_group) {                                         \
-    switch(group) {                                                  \
-    case GENERAL:                                                    \
-      log("-= General =-");                                          \
-      break;                                                         \
-    case KEYBINDING:                                                 \
-      log("\n-= Keybinding =-");                                     \
-      break;                                                         \
-    case FRIENDS:                                                    \
-      log("\n-= Friends =-");                                        \
-      break;                                                         \
-    default:                                                         \
-      assert(false);                                                 \
-    }                                                                \
-    last_group = group;                                              \
-  }                                                                  \
-                                                                     \
-  snprintf_param(ptr, buffer + pos, sizeof(buffer) - pos, str, op);  \
-  log("%s", buffer); \
-
-  CONFIG
-#undef X
-}
-
 char*
 giti_config_to_string(const giti_config_t* config_)
 {
   (void)config_;
 
-  size_t buf_sz = 4096;
+  size_t buf_sz  = 4096;
   size_t written = 0;
   char* str = calloc(1, buf_sz);
 

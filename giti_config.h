@@ -1,6 +1,8 @@
 #ifndef GITI_CONFIG_H_
 #define GITI_CONFIG_H_
 
+#include <stdint.h>
+
 #include "dlist.h"
 
 typedef struct giti_config {
@@ -10,20 +12,20 @@ typedef struct giti_config {
     long  timeout;
   } general;
   struct {
-    char up;
-    char down;
-    char back;
-    char help;
+    uint32_t up;
+    uint32_t down;
+    uint32_t back;
+    uint32_t help;
     struct {
-      char filter;
-      char highlight;
-      char my;
-      char friends;
+      uint32_t filter;
+      uint32_t highlight;
+      uint32_t my;
+      uint32_t friends;
     } log;
     struct {
-      char info;
-      char files;
-      char show;
+      uint32_t info;
+      uint32_t files;
+      uint32_t show;
     } commit;
   } keybinding;
   dlist_t* friends;
@@ -32,9 +34,6 @@ typedef struct giti_config {
 
 giti_config_t*
 giti_config_create(char* str_config, const char* user_name, const char* user_email);
-
-void
-giti_config_print(const giti_config_t* config);
 
 char*
 giti_config_to_string(const giti_config_t* config);
