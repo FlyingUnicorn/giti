@@ -40,9 +40,9 @@ typedef enum group {
   X(KEYBINDING, "keybinding.back",          KEY,       "q",                 config.keybinding.back)          \
   X(KEYBINDING, "keybinding.help",          KEY,       "?",                 config.keybinding.help)          \
   X(KEYBINDING, "keybinding.log.filter",    KEY,       "s",                 config.keybinding.log.filter)    \
-  X(KEYBINDING, "keybinding.log.highlight", KEY,       "S",                 config.keybinding.log.highlight) \
+  X(KEYBINDING, "keybinding.log.highlight", KEY,       "CTRL+s",            config.keybinding.log.highlight) \
   X(KEYBINDING, "keybinding.log.my",        KEY,       "m",                 config.keybinding.log.my)        \
-  X(KEYBINDING, "keybinding.log.friends",   KEY,       "M",                 config.keybinding.log.friends)   \
+  X(KEYBINDING, "keybinding.log.friends",   KEY,       "META+m",            config.keybinding.log.friends)   \
   X(KEYBINDING, "keybinding.commit.info",   KEY,       "i",                 config.keybinding.commit.info)   \
   X(KEYBINDING, "keybinding.commit.files",  KEY,       "f",                 config.keybinding.commit.files)  \
   X(KEYBINDING, "keybinding.commit.show",   KEY,       "d",                 config.keybinding.commit.show)   \
@@ -63,11 +63,33 @@ snprintf_uint(char* buf, size_t buf_sz, int pad, const char* header, op_t op, un
 {
   size_t written = 0;
   switch (op) {
-    case VALUE:
-    case KEY:
+    case KEY: {
+      size_t pos = 0;
+      char   str_val[32];
+
+      // log_debug("%s=%u", header, val);
+      if (val >= 1 && val <= 24) { /* CTRL+a - CTRL+x */
+        pos += snprintf(str_val, sizeof(str_val), "CTRL+");
+        val += 96; /* change to A - z char */
+      }
+      else if (val >= 225 && val <= 255) { /* META+a - META+z */
+        pos += snprintf(str_val, sizeof(str_val), "META+");
+        val = 97 + (val - 225);
+      }
+
+      if (val >= 97 && val <= 122) { /* A - z */
+        pos += snprintf(str_val + pos, sizeof(str_val) - pos, "%c", val);
+      }
+
+      written = snprintf(buf, buf_sz, "%s:", header);
+      written += snprintf(buf += written, buf_sz - written, "%*s%s", (int)(pad-written), "", str_val);
+      break;
+    }
+    case VALUE: {
       written = snprintf(buf, buf_sz, "%s:", header);
       written += snprintf(buf += written, buf_sz - written, "%*s%u", (int)(pad-written), "", val);
       break;
+    }
     case COLOR_CODE:
       written = snprintf(buf, buf_sz, "%s:", header);
       written += snprintf(buf += written, buf_sz - written, "%*s0x%06x", (int)(pad-written), "", val);
@@ -81,11 +103,16 @@ snprintf_uint(char* buf, size_t buf_sz, int pad, const char* header, op_t op, un
 size_t
 snprintf_string(char* buf, size_t buf_sz, int pad, const char* header, op_t op, char* val)
 {
-  assert(op == VALUE || op == KEY);
-
   size_t written = 0;
-  written = snprintf(buf, buf_sz, "%s:", header);
-  written += snprintf(buf += written, buf_sz - written, "%*s%s", (int)(pad-written), "", val);
+  switch (op) {
+    case KEY:
+    case VALUE:
+      written = snprintf(buf, buf_sz, "%s:", header);
+      written += snprintf(buf += written, buf_sz - written, "%*s%s", (int)(pad-written), "", val);
+      break;
+    default:
+      abort();
+  }
 
   return written;
 }
@@ -126,14 +153,15 @@ format_uint(op_t op, const char* str, void* ptr)
     case COLOR_CODE:
       *p = strtoul(str, NULL, 16);
       break;
-    case KEY:
-      *p = str[0];
+    case KEY: {
+      *p = strncmp(str, "CTRL+", strlen("CTRL+")) == 0 ? str[5] -  96 : str[0];
+      *p = strncmp(str, "META+", strlen("META+")) == 0 ? str[5] + 128 : *p;
       break;
+    }
     default:
       abort();
   }
 }
-
 
 void
 format_string(op_t op, const char* str, void* ptr)
@@ -209,10 +237,10 @@ char*
 giti_config_get_value(const char* str) {
 
   char* str_value = strchr(str, ':');
-   str_value += 1;
-   //log_debug("str: <%s> val: <%s>", str_value, strtrimall(str_value));
+  str_value += 1;
+  //log_debug("str: <%s> val: <%s>", str_value, strtrimall(str_value));
 
-   return strtrimall(str_value);
+  return strtrimall(str_value);
 }
 
 void
@@ -306,6 +334,5 @@ giti_config_to_string(const giti_config_t* config_)
 
   CONFIG
 #undef X
-
- return str;
+  return str;
 }

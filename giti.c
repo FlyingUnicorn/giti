@@ -1881,7 +1881,7 @@ main()
     uint32_t wch;
     while (true) {
         wget_wch(giti_window_stack_get(gws, GITI_WINDOW_STACK_BOTTOM)->w, &wch);
-        //log("wch: %d\n", ch);
+        //log("wch: %d", wch);
 
         giti_window_t* tw = giti_window_stack_get(gws, GITI_WINDOW_STACK_TOP);
         bool claimed = false;
