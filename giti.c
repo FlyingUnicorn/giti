@@ -1028,17 +1028,16 @@ giti_log_filter(giti_log_t* gl)
 
     giti_commit_t* e = NULL;
     dlist_iterator_t* it = dlist_iterator_create(gl->entries);
+
     while ((e = dlist_iterator_next(it))) {
 
         wchar_t wstr[256] = { 0 };
         swprintf(wstr, array_size(wstr), L"%s %s %s %s %s", e->h, e->ci_date, e->an, e->ae, e->s);
 
         const wchar_t* str = gl->filter.str_pos ? gl->filter.str : NULL;
-        //bool match = false;
-        //match |= (!gl->filter.self || (gl->filter.self && strstr(gl->user_email, e->ae))) && (!str || (str && strwcmp(str, wstr)));
 
-        bool match = str && strwcmp(str, wstr);
-        match |= !gl->filter.self && !gl->filter.friends;
+        bool match = !str && !gl->filter.self && !gl->filter.friends;
+        match |= str && strwcmp(str, wstr);
         match |= gl->filter.self && e->is_self;
         match |= gl->filter.friends && e->is_friend;
 
@@ -1085,21 +1084,22 @@ giti_log_shortcut(void* gl_, wint_t wch, uint32_t action_id, giti_window_opt_t* 
         else if (wch == (wint_t)g_config->keybinding.log.friends) {
             gl->filter.friends = !gl->filter.friends;
         }
-        else if (wch == (wint_t)g_config->keybinding.log.search) {
-            gl->filter.active = true;
+        else if (wch == (wint_t)g_config->keybinding.log.filter) {
+            gl->filter.active   = true;
             gl->filter.show_all = false;
-            gl->filter.str_pos = 0;
+            gl->filter.str_pos  = 0;
             memset(gl->filter.str, 0, sizeof(gl->filter.str));
         }
-        else if (wch == (wint_t)g_config->keybinding.log.filter) {
-            gl->filter.active = true;
+        else if (wch == (wint_t)g_config->keybinding.log.highlight) {
+            gl->filter.active   = true;
             gl->filter.show_all = true;
-            gl->filter.str_pos = 0;
+            gl->filter.str_pos  = 0;
             memset(gl->filter.str, 0, sizeof(gl->filter.str));
         }
         else if (wch == (wint_t)g_config->keybinding.back) {
             if (gl->filter.str_pos) {
-                gl->filter.str_pos = 0;
+                gl->filter.str_pos  = 0;
+                gl->filter.show_all = false;
             }
             else {
                 claimed = false;

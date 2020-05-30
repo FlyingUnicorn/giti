@@ -32,21 +32,21 @@ typedef enum group {
 
 
 #define CONFIG \
-  X(GENERAL,    "general.timeout",         VALUE, 500,  config.general.timeout)         \
-  X(GENERAL,    "general.user_name",       VALUE, NULL, config.general.user_name)       \
-  X(GENERAL,    "general.user_email",      VALUE, NULL, config.general.user_email)      \
-  X(KEYBINDING, "keybinding.up",           VALUE, "k",  config.keybinding.up)           \
-  X(KEYBINDING, "keybinding.down",         VALUE, "j",  config.keybinding.down)         \
-  X(KEYBINDING, "keybinding.back",         VALUE, "q",  config.keybinding.back)         \
-  X(KEYBINDING, "keybinding.help",         VALUE, "?",  config.keybinding.help)         \
-  X(KEYBINDING, "keybinding.log.filter",   VALUE, "s",  config.keybinding.log.filter)   \
-  X(KEYBINDING, "keybinding.log.search",   VALUE, "S",  config.keybinding.log.search)   \
-  X(KEYBINDING, "keybinding.log.my",       VALUE, "m",  config.keybinding.log.my)       \
-  X(KEYBINDING, "keybinding.log.friends",  VALUE, "M",  config.keybinding.log.friends)  \
-  X(KEYBINDING, "keybinding.commit.info",  VALUE, "i",  config.keybinding.commit.info)  \
-  X(KEYBINDING, "keybinding.commit.files", VALUE, "f",  config.keybinding.commit.files) \
-  X(KEYBINDING, "keybinding.commit.show",  VALUE, "d",  config.keybinding.commit.show)  \
-  X(FRIENDS,    "friends",                 LIST,  NULL, config.friends)                 \
+  X(GENERAL,    "general.timeout",          VALUE, 500,  config.general.timeout)          \
+  X(GENERAL,    "general.user_name",        VALUE, NULL, config.general.user_name)        \
+  X(GENERAL,    "general.user_email",       VALUE, NULL, config.general.user_email)       \
+  X(KEYBINDING, "keybinding.up",            VALUE, "k",  config.keybinding.up)            \
+  X(KEYBINDING, "keybinding.down",          VALUE, "j",  config.keybinding.down)          \
+  X(KEYBINDING, "keybinding.back",          VALUE, "q",  config.keybinding.back)          \
+  X(KEYBINDING, "keybinding.help",          VALUE, "?",  config.keybinding.help)          \
+  X(KEYBINDING, "keybinding.log.filter",    VALUE, "s",  config.keybinding.log.filter)    \
+  X(KEYBINDING, "keybinding.log.highlight", VALUE, "S",  config.keybinding.log.highlight) \
+  X(KEYBINDING, "keybinding.log.my",        VALUE, "m",  config.keybinding.log.my)        \
+  X(KEYBINDING, "keybinding.log.friends",   VALUE, "M",  config.keybinding.log.friends)   \
+  X(KEYBINDING, "keybinding.commit.info",   VALUE, "i",  config.keybinding.commit.info)   \
+  X(KEYBINDING, "keybinding.commit.files",  VALUE, "f",  config.keybinding.commit.files)  \
+  X(KEYBINDING, "keybinding.commit.show",   VALUE, "d",  config.keybinding.commit.show)   \
+  X(FRIENDS,    "friends",                  LIST,  NULL, config.friends)                  \
 
 size_t
 snprintf_char(char* buf, size_t buf_sz, const char* header, op_t op, char val)

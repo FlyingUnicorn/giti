@@ -16,7 +16,7 @@ typedef struct giti_config {
     char help;
     struct {
       char filter;
-      char search;
+      char highlight;
       char my;
       char friends;
     } log;
