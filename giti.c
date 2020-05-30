@@ -35,6 +35,7 @@
 
 #define array_size(a) (sizeof a) / (sizeof (a)[0])
 
+#define ESC 27
 
 giti_config_t* g_config;
 
@@ -1069,6 +1070,10 @@ giti_log_shortcut(void* gl_, uint32_t wch, uint32_t action_id, giti_window_opt_t
         if (wch == '\n') {
             gl->filter.active = false;
         }
+        else if (wch == ESC && gl->filter.active) {
+            gl->filter.active  = false;
+            gl->filter.str_pos = 0;
+        }
         else if (wch == KEY_BACKSPACE || wch == 127 || wch == '\b') { /* backspace */
             if (gl->filter.str_pos) {
                 gl->filter.str[--gl->filter.str_pos] = L'\0';
@@ -1097,7 +1102,7 @@ giti_log_shortcut(void* gl_, uint32_t wch, uint32_t action_id, giti_window_opt_t
             gl->filter.str_pos  = 0;
             memset(gl->filter.str, 0, sizeof(gl->filter.str));
         }
-        else if (wch == g_config->keybinding.back) {
+        else if (wch == g_config->keybinding.back || wch == ESC) {
             if (gl->filter.str_pos) {
                 gl->filter.str_pos  = 0;
                 gl->filter.show_all = false;
@@ -1900,6 +1905,7 @@ main()
     start_color();
     noecho();
     curs_set(0);
+    set_escdelay(0);
 
     giti_window_opt_t opt = giti_summary_create(current_branch);
     giti_window_stack_t* gws = giti_window_stack_create(opt);
@@ -1936,14 +1942,12 @@ main()
         }
 
         if (!claimed) {
-            if (wch == g_config->keybinding.back) {
+            if (wch == g_config->keybinding.back || wch == ESC) {
                 if (giti_window_stack_pop(gws)) {
                     goto exit;
                 }
             }
-            else if (wch == KEY_UP ||
-                     wch == g_config->keybinding.up ||
-                     wch == KEY_PPAGE ||
+            else if (wch == KEY_UP || wch == g_config->keybinding.up || wch == KEY_PPAGE ||
                      wch == g_config->keybinding.up_page) {
 
                 int i = 1;
@@ -1951,9 +1955,7 @@ main()
                 i = wch == g_config->keybinding.up_page ? tw->ymax - 2 : i;
                 tw->pos = MAX(0, tw->pos - i);
             }
-            else if (wch == KEY_DOWN ||
-                     wch == g_config->keybinding.down ||
-                     wch == KEY_NPAGE ||
+            else if (wch == KEY_DOWN || wch == g_config->keybinding.down || wch == KEY_NPAGE ||
                      wch == g_config->keybinding.down_page) {
 
                 int i = 1;
