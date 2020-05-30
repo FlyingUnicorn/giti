@@ -740,6 +740,8 @@ giti_commit_files(giti_commit_t* c)
 static char*
 giti_commit_menu_title_str(void* c_, giti_strbuf_t strbuf)
 {
+    (void)c_;
+
     snprintf(strbuf, sizeof(giti_strbuf_t), "Commit options");
     return strbuf;
 }
@@ -747,6 +749,8 @@ giti_commit_menu_title_str(void* c_, giti_strbuf_t strbuf)
 static char*
 giti_commit_info_title_str(void* c_, giti_strbuf_t strbuf)
 {
+    (void)c_;
+
     snprintf(strbuf, sizeof(giti_strbuf_t), "Commit Info");
     return strbuf;
 }
@@ -754,6 +758,8 @@ giti_commit_info_title_str(void* c_, giti_strbuf_t strbuf)
 static char*
 giti_commit_files_title_str(void* c_, giti_strbuf_t strbuf)
 {
+    (void)c_;
+
     snprintf(strbuf, sizeof(giti_strbuf_t), "Commit Files");
     return strbuf;
 }
@@ -761,6 +767,8 @@ giti_commit_files_title_str(void* c_, giti_strbuf_t strbuf)
 static dlist_t*
 giti_commit_files_color_filter(void* c_)
 {
+    (void)c_;
+
     /* change to regexp */
     dlist_t* color_filter = dlist_create();
 
@@ -828,6 +836,8 @@ giti_commit_action(void* c_, uint32_t action_id, giti_window_opt_t* opt)
         opt->xmax = -1;
     }
     else if (action_id == ' ') {
+        giti_config_key_strbuf_t strbuf = { 0 };
+
         giti_window_menu_t* gwm = giti_window_menu_create();
         opt->type = S_ITEM_TYPE_MENU;
         opt->menu = gwm->menu;
@@ -843,24 +853,27 @@ giti_commit_action(void* c_, uint32_t action_id, giti_window_opt_t* opt)
         item->type = S_ITEM_TYPE_TEXT;
         item->cb_arg = c;
         item->cb_action = giti_commit_action;
-        item->action_id = 'i';
-        snprintf(item->name, sizeof(item->name), "Show commit info       [%c]", g_config->keybinding.commit.info);
+        item->action_id = g_config->keybinding.commit.info;
+        snprintf(item->name, sizeof(item->name), "Show commit info    [%s]",
+                 giti_config_key_to_string(item->action_id, strbuf));
         dlist_append(gwm->menu, item);
 
         item = calloc(1, sizeof *item);
         item->type = S_ITEM_TYPE_ACTION;
         item->cb_arg = c;
         item->cb_action = giti_commit_action;
-        item->action_id = 'd';
-        snprintf(item->name, sizeof(item->name), "Open commit diff       [%c]", g_config->keybinding.commit.show);
+        item->action_id = g_config->keybinding.commit.show;
+        snprintf(item->name, sizeof(item->name), "Open commit diff    [%s]",
+                 giti_config_key_to_string(item->action_id, strbuf));
         dlist_append(gwm->menu, item);
 
         item = calloc(1, sizeof *item);
         item->type = S_ITEM_TYPE_TEXT;
         item->cb_arg = c;
         item->cb_action = giti_commit_action;
-        item->action_id = 'f';
-        snprintf(item->name, sizeof(item->name), "Show commit files      [%c]", g_config->keybinding.commit.files);
+        item->action_id = g_config->keybinding.commit.files;
+        snprintf(item->name, sizeof(item->name), "Show commit files   [%s]",
+                 giti_config_key_to_string(item->action_id, strbuf));
         dlist_append(gwm->menu, item);
     }
     else {
@@ -1039,6 +1052,9 @@ giti_log_filter(giti_log_t* gl)
 static bool
 giti_log_shortcut(void* gl_, uint32_t wch, uint32_t action_id, giti_window_opt_t* opt)
 {
+    (void)action_id;
+    (void)opt;
+
     giti_log_t* gl = gl_;
 
     bool claimed = true;
@@ -1268,6 +1284,8 @@ giti_branch(const char* current_branch)
 static char*
 giti_branch_menu_title_str(void* e_, giti_strbuf_t strbuf)
 {
+    (void)e_;
+
     snprintf(strbuf, sizeof(giti_strbuf_t), "Branch Options");
     return strbuf;
 }
@@ -1282,12 +1300,13 @@ giti_branch_action(void* b_, uint32_t action_id, giti_window_opt_t* opt)
 
     bool claimed = true;
 
-    switch (action_id) {
-    case 'l':
+    if (action_id == g_config->keybinding.logs) {
         //log("log %s", b->name);
         *opt = giti_log_create(b->name, 10000);
-        break;
-    case ' ': {
+    }
+    else if (action_id == ' ') {
+        giti_config_key_strbuf_t strbuf = { 0 };
+
         giti_window_menu_t* gwm = giti_window_menu_create();
         opt->menu           = gwm->menu;
         opt->type           = S_ITEM_TYPE_MENU;
@@ -1304,8 +1323,10 @@ giti_branch_action(void* b_, uint32_t action_id, giti_window_opt_t* opt)
         item->type = S_ITEM_TYPE_MENU;
         item->cb_arg = b;
         item->cb_action = giti_branch_action;
-        item->action_id = 'l';
-        strncpy(item->name, "Show branch log                     [l]", sizeof(item->name));
+        item->action_id = g_config->keybinding.logs;
+        snprintf(item->name, sizeof(item->name), "Show branch log    [%s]",
+                 giti_config_key_to_string(item->action_id, strbuf));
+
         dlist_append(gwm->menu, item);
 
         if (!b->is_current_branch) {
@@ -1327,20 +1348,15 @@ giti_branch_action(void* b_, uint32_t action_id, giti_window_opt_t* opt)
             item->action_id = 12346;
             dlist_append(gwm->menu, item);
         }
-
-        break;
     }
-    case 12345: {
+    else if (action_id == 12345) {
         giti_branch_checkout(b->name);
-        break;
     }
-    case 12346: {
+    else if (action_id == 12346) {
         giti_branch_rebase(b->upstream);
-        break;
     }
-    default:
+    else {
         claimed = false;
-        break;
     }
 
     return claimed;
@@ -1371,7 +1387,11 @@ typedef struct giti_branches {
 static bool
 giti_branches_shortcut(void* gb_, uint32_t wch, uint32_t action_id, giti_window_opt_t* opt)
 {
-    // giti_log_t* gb = gb_;
+    (void)gb_;
+    (void)wch;
+    (void)action_id;
+    (void)opt;
+
     return false;
 }
 
@@ -1489,40 +1509,42 @@ giti_summary_action(void* gs_, uint32_t action_id, giti_window_opt_t* opt)
     giti_summary_t* gs = gs_;
 
     bool claimed = true;
-    if (action_id == 'l') {
+    if (action_id == g_config->keybinding.logs) {
         *opt = giti_log_create(gs->branch, 100000);
     }
-    else if (action_id == 'b') {
+    else if (action_id == g_config->keybinding.branches) {
         *opt = giti_branches_create(gs->branch, gs->branches);
     }
     else if (action_id == ' ') {
+        giti_config_key_strbuf_t strbuf = { 0 };
+
         giti_window_menu_t* gwm = giti_window_menu_create();
-        opt->type = S_ITEM_TYPE_MENU;
-        opt->menu = gwm->menu;
-        //opt->cb_title = giti_commit_menu_title_str;
-        opt->cb_shortcut = giti_summary_shortcut;
-        opt->cb_destroy = giti_window_menu_destroy;
-        opt->cb_arg = gs;
-        opt->cb_arg_destroy = gwm;
-        opt->xmax = -1;
+        opt->type               = S_ITEM_TYPE_MENU;
+        opt->menu               = gwm->menu;
+        opt->cb_shortcut        = giti_summary_shortcut;
+        opt->cb_destroy         = giti_window_menu_destroy;
+        opt->cb_arg             = gs;
+        opt->cb_arg_destroy     = gwm;
+        opt->xmax               = -1;
 
         giti_menu_item_t* item = NULL;
         item = calloc(1, sizeof *item);
-        item->type = S_ITEM_TYPE_MENU;
-        item->cb_arg = gs;
+        item->type      = S_ITEM_TYPE_MENU;
+        item->cb_arg    = gs;
         item->cb_action = giti_summary_action;
-        item->action_id = 'l';
-        strncpy(item->name, "Show log           [l]", sizeof(item->name));
+        item->action_id = g_config->keybinding.logs;
+        snprintf(item->name, sizeof(item->name), "Show log         [%s]",
+                 giti_config_key_to_string(item->action_id, strbuf));
         dlist_append(gwm->menu, item);
 
         item = calloc(1, sizeof *item);
-        item->type = S_ITEM_TYPE_MENU;
-        item->cb_arg = gs;
+        item->type      = S_ITEM_TYPE_MENU;
+        item->cb_arg    = gs;
         item->cb_action = giti_summary_action;
-        item->action_id = 'b';
-        strncpy(item->name, "Show branches      [b]", sizeof(item->name));
+        item->action_id = g_config->keybinding.branches;
+        snprintf(item->name, sizeof(item->name), "Show branches    [%s]",
+                 giti_config_key_to_string(item->action_id, strbuf));
         dlist_append(gwm->menu, item);
-
     }
     else {
         claimed = false;
@@ -1537,16 +1559,16 @@ giti_summary_shortcut(void* gs_, uint32_t wch, uint32_t action_id, giti_window_o
     giti_summary_t* gs = gs_;
 
     bool claimed = false;
-    if (wch == 'l' || wch == 'b'|| wch == ' ') {
+    if (wch == g_config->keybinding.logs || wch == g_config->keybinding.branches || wch == ' ') {
         claimed = giti_summary_action(gs, action_id ? action_id : wch, opt);
     }
     else if (wch == g_config->keybinding.help) {
-        opt->text = giti_summary_help(gs);
-        opt->type = S_ITEM_TYPE_TEXT;
+        opt->text     = giti_summary_help(gs);
+        opt->type     = S_ITEM_TYPE_TEXT;
         opt->cb_title = giti_summary_help_title_str;
-        opt->cb_arg = gs;
-        opt->xmax = -1;
-        claimed = true;
+        opt->cb_arg   = gs;
+        opt->xmax     = -1;
+        claimed       = true;
     }
 
     return claimed;
@@ -1555,7 +1577,8 @@ giti_summary_shortcut(void* gs_, uint32_t wch, uint32_t action_id, giti_window_o
 static char*
 giti_summary_title_str(void* gs_, giti_strbuf_t strbuf)
 {
-    //giti_summary_t* gs = gs_;
+    (void)gs_;
+
     snprintf(strbuf, sizeof(giti_strbuf_t), "<giti-clr-1>GIT<giti-clr-end>i");
     return strbuf;
 }
@@ -1842,7 +1865,7 @@ main()
     setlocale(LC_ALL, "");
     log("-- START --");
 
-    const char* path_config = getenv("GITI_CONFIG_FILE");
+    const char* path_config = getenv("GITI_CONFIG_FILE"); /* add this to help */
     if (!path_config) {
         path_config = "~/.gitirc";
     }
@@ -1863,10 +1886,7 @@ main()
     free(user_name);
     free(user_email);
 
-    log(giti_config_to_string(g_config));
-
     char* current_branch = giti_current_branch();
-
 
     initscr();
     start_color();

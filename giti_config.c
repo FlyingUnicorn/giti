@@ -39,8 +39,10 @@ typedef enum group {
   X(KEYBINDING, "keybinding.down",          KEY,       "j",                 config.keybinding.down)          \
   X(KEYBINDING, "keybinding.back",          KEY,       "q",                 config.keybinding.back)          \
   X(KEYBINDING, "keybinding.help",          KEY,       "?",                 config.keybinding.help)          \
+  X(KEYBINDING, "keybinding.logs",          KEY,       "l",                 config.keybinding.logs)          \
+  X(KEYBINDING, "keybinding.branches",      KEY,       "b",                 config.keybinding.branches)      \
   X(KEYBINDING, "keybinding.log.filter",    KEY,       "s",                 config.keybinding.log.filter)    \
-  X(KEYBINDING, "keybinding.log.highlight", KEY,       "CTRL+s",            config.keybinding.log.highlight) \
+  X(KEYBINDING, "keybinding.log.highlight", KEY,       "META+s",            config.keybinding.log.highlight) \
   X(KEYBINDING, "keybinding.log.my",        KEY,       "m",                 config.keybinding.log.my)        \
   X(KEYBINDING, "keybinding.log.friends",   KEY,       "META+m",            config.keybinding.log.friends)   \
   X(KEYBINDING, "keybinding.commit.info",   KEY,       "i",                 config.keybinding.commit.info)   \
@@ -64,22 +66,10 @@ snprintf_uint(char* buf, size_t buf_sz, int pad, const char* header, op_t op, un
   size_t written = 0;
   switch (op) {
     case KEY: {
-      size_t pos = 0;
-      char   str_val[32];
-
-      // log_debug("%s=%u", header, val);
-      if (val >= 1 && val <= 24) { /* CTRL+a - CTRL+x */
-        pos += snprintf(str_val, sizeof(str_val), "CTRL+");
-        val += 96; /* change to A - z char */
-      }
-      else if (val >= 225 && val <= 255) { /* META+a - META+z */
-        pos += snprintf(str_val, sizeof(str_val), "META+");
-        val = 97 + (val - 225);
-      }
-
-      if (val >= 97 && val <= 122) { /* A - z */
-        pos += snprintf(str_val + pos, sizeof(str_val) - pos, "%c", val);
-      }
+      char                     str_val[32];
+      size_t                   pos    = 0;
+      giti_config_key_strbuf_t strbuf = { 0 };
+      pos += snprintf(str_val + pos, sizeof(str_val) - pos, "%s", giti_config_key_to_string(val, strbuf));
 
       written = snprintf(buf, buf_sz, "%s:", header);
       written += snprintf(buf += written, buf_sz - written, "%*s%s", (int)(pad-written), "", str_val);
@@ -335,4 +325,29 @@ giti_config_to_string(const giti_config_t* config_)
   CONFIG
 #undef X
   return str;
+}
+
+const char*
+giti_config_key_to_string(uint32_t key, giti_config_key_strbuf_t strbuf)
+{
+  size_t pos = 0;
+
+  if (key >= 1 && key <= 24) { /* CTRL+a - CTRL+x */
+    pos += snprintf(strbuf, sizeof(&strbuf), "CTRL+");
+    key += 96; /* change to A - z char */
+  }
+  else if (key >= 225 && key <= 255) { /* META+a - META+z */
+    pos += snprintf(strbuf, sizeof(&strbuf), "META+");
+    key = 97 + (key - 225);
+  }
+
+  if (key >= 63 && key <= 122) { /* ... - z */
+    snprintf(strbuf + pos, sizeof(&strbuf) - pos, "%c", key);
+  }
+  else {
+    log("invalid key: %u", key);
+    abort();
+  }
+
+  return strbuf;
 }

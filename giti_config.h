@@ -6,6 +6,8 @@
 #include "dlist.h"
 #include "giti_color.h"
 
+typedef char giti_config_key_strbuf_t[6];
+
 typedef struct giti_config {
   struct {
     char*             user_name;
@@ -17,6 +19,8 @@ typedef struct giti_config {
     uint32_t          down;
     uint32_t          back;
     uint32_t          help;
+    uint32_t          logs;
+    uint32_t          branches;
     struct {
       uint32_t        filter;
       uint32_t        highlight;
@@ -39,5 +43,8 @@ giti_config_create(char* str_config, const char* user_name, const char* user_ema
 
 char*
 giti_config_to_string(const giti_config_t* config);
+
+const char*
+giti_config_key_to_string(uint32_t key, giti_config_key_strbuf_t strbuf);
 
 #endif
