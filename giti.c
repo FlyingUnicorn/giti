@@ -38,7 +38,6 @@
 
 giti_config_t* g_config;
 
-
 typedef char giti_strbuf_t[256];
 typedef char giti_strbuf_info_t[4096];
 
@@ -695,14 +694,22 @@ giti_commit_row(giti_strbuf_t strbuf, void* e_)
     size_t pos = 0;
     pos += snprintf(strbuf + pos, sizeof(giti_strbuf_t) - pos, "%s <giti-clr-2>%s<giti-clr-end> <giti-clr-3>%s<giti-clr-end>", e->h, e->ci_date, e->ci_time);
 
+    char* str_name = malloc(g_config->format.max_width_name);
+    snprintf(str_name, g_config->format.max_width_name, "%s", e->an);
+    if (strlen(e->an) > g_config->format.max_width_name) {
+        str_name[g_config->format.max_width_name - 3] = '.';
+        str_name[g_config->format.max_width_name - 2] = '.';
+        str_name[g_config->format.max_width_name - 1] = '\0';
+    }
+
     if (e->is_self) {
-        pos += snprintf(strbuf + pos, sizeof(giti_strbuf_t) - pos, " <giti-clr-1>%-30s<giti-clr-end>", e->an);
+        pos += snprintf(strbuf + pos, sizeof(giti_strbuf_t) - pos, " <giti-clr-1>%*s<giti-clr-end>", g_config->format.max_width_name, str_name);
     }
     else if (e->is_friend) {
-        pos += snprintf(strbuf + pos, sizeof(giti_strbuf_t) - pos, " <giti-clr-on>%-30s<giti-clr-end>", e->an);
+        pos += snprintf(strbuf + pos, sizeof(giti_strbuf_t) - pos, " <giti-clr-on>%*s<giti-clr-end>", g_config->format.max_width_name, str_name);
     }
     else {
-        pos += snprintf(strbuf + pos, sizeof(giti_strbuf_t) - pos, " %-30s", e->an);
+        pos += snprintf(strbuf + pos, sizeof(giti_strbuf_t) - pos, " %*s", g_config->format.max_width_name, str_name);
     }
     pos += snprintf(strbuf + pos, sizeof(giti_strbuf_t) - pos, " %s", e->s);
     return strbuf;

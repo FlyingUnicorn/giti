@@ -50,11 +50,11 @@ typedef enum group {
   X(KEYBINDING, "keybinding.commit.show",   KEY,       "d",                 config.keybinding.commit.show)   \
   X(FRIENDS,    "friends",                  LIST,       NULL,               config.friends)                  \
   X(COLOR,      "color.fgm",                COLOR_CODE, (uint32_t)0xD1F2EB, config.color.fg.c)               \
-  X(COLOR,      "color.bgm",                COLOR_CODE, (uint32_t)0x000000, config.color.bg.c)               \
-  X(COLOR,      "color.bg_selected",        COLOR_CODE, (uint32_t)0x4FC3F7, config.color.bg_selected.c)      \
-  X(COLOR,      "color.fg1",                COLOR_CODE, (uint32_t)0xFFAB91, config.color.fg1.c)              \
-  X(COLOR,      "color.fg2",                COLOR_CODE, (uint32_t)0x148686, config.color.fg2.c)              \
-  X(COLOR,      "color.fg3",                COLOR_CODE, (uint32_t)0x6c648b, config.color.fg3.c)              \
+  X(COLOR,      "color.bgm",                COLOR_CODE, (uint32_t)0x34495E, config.color.bg.c)               \
+  X(COLOR,      "color.bg_selected",        COLOR_CODE, (uint32_t)0x78909C, config.color.bg_selected.c)      \
+  X(COLOR,      "color.fg1",                COLOR_CODE, (uint32_t)0xE74C3C, config.color.fg1.c)              \
+  X(COLOR,      "color.fg2",                COLOR_CODE, (uint32_t)0x82E0AA, config.color.fg2.c)              \
+  X(COLOR,      "color.fg3",                COLOR_CODE, (uint32_t)0xEDBB99, config.color.fg3.c)              \
   X(COLOR,      "color.on",                 COLOR_CODE, (uint32_t)0x00FF00, config.color.on.c)               \
   X(COLOR,      "color.off",                COLOR_CODE, (uint32_t)0xFF0000, config.color.off.c)              \
   X(COLOR,      "color.inactive",           COLOR_CODE, (uint32_t)0x78909C, config.color.inactive.c)         \
@@ -261,9 +261,10 @@ giti_config_line(const char* line)
 giti_config_t*
 giti_config_create(char* str_config, const char* user_name, const char* user_email)
 {
-   config.friends = dlist_create(); // todo fix this
-   config.general.user_name  = strdup(user_name);
-   config.general.user_email = strdup(user_email);
+   config.friends               = dlist_create(); // todo fix this
+   config.general.user_name     = strdup(user_name);
+   config.general.user_email    = strdup(user_email);
+   config.format.max_width_name = 20;
 
     str_config = str_config ? str_config : giti_config_default_create();
     char* curline = str_config;

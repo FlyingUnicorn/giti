@@ -33,6 +33,9 @@ typedef struct giti_config {
       uint32_t        show;
     } commit;
   } keybinding;
+  struct {
+    uint32_t          max_width_name;
+  } format;
   dlist_t*            friends;
   giti_color_scheme_t color;
 } giti_config_t;
