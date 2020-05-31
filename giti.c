@@ -94,41 +94,17 @@ strlen_formatted(const char* str)
 {
     size_t len = 0;
     for(const char* ch = str; *ch; ++ch) {
-
-        if (strncmp(ch, "<giti-clr-1>", strlen("<giti-clr-1>")) == 0) {
-            ch += strlen("<giti-clr-1>") - 1;
-            continue;
+        static bool active = false;
+        if (strncmp(ch, "<giti-clr-", strlen("<giti-clr-")) == 0) {
+            ch += strlen("<giti-clr-") - 1;
+            active = true;
         }
-        if (strncmp(ch, "<giti-clr-2>", strlen("<giti-clr-2>")) == 0) {
-            ch += strlen("<giti-clr-2>") - 1;
-            continue;
+        else if (active) {
+            active = *ch != '>';
         }
-        if (strncmp(ch, "<giti-clr-3>", strlen("<giti-clr-3>")) == 0) {
-            ch += strlen("<giti-clr-3>") - 1;
-            continue;
+        else {
+            ++len;
         }
-        if (strncmp(ch, "<giti-clr-on>", strlen("<giti-clr-on>")) == 0) {
-            ch += strlen("<giti-clr-on>") - 1;
-            continue;
-        }
-        if (strncmp(ch, "<giti-clr-off>", strlen("<giti-clr-off>")) == 0) {
-            ch += strlen("<giti-clr-off>") - 1;
-            continue;
-        }
-        if (strncmp(ch, "<giti-clr-inactive>", strlen("<giti-clr-inactive>")) == 0) {
-            ch += strlen("<giti-clr-inactive>") - 1;
-            continue;
-        }
-        if (strncmp(ch, "<giti-clr-friend>", strlen("<giti-clr-friend>")) == 0) {
-            ch += strlen("<giti-clr-friend>") - 1;
-            continue;
-        }
-        if (strncmp(ch, "<giti-clr-end>", strlen("<giti-clr-end>")) == 0) {
-            ch += strlen("<giti-clr-end>") - 1;
-            continue;
-        }
-
-        ++len;
     }
     return len;
 }
