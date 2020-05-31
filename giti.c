@@ -1943,6 +1943,14 @@ main()
         wget_wch(giti_window_stack_get(gws, GITI_WINDOW_STACK_BOTTOM)->w, &wch);
         //log("wch: %d", wch);
 
+        if (wch == ESC) {
+            /* key is ALT or ESC - need to determine which */
+            nodelay(giti_window_stack_get(gws, GITI_WINDOW_STACK_BOTTOM)->w, true);
+            wget_wch(giti_window_stack_get(gws, GITI_WINDOW_STACK_BOTTOM)->w, &wch);
+            wch = wch ? wch + 128 : ESC;
+            nodelay(giti_window_stack_get(gws, GITI_WINDOW_STACK_BOTTOM)->w, false);
+        }
+
         giti_window_t* tw = giti_window_stack_get(gws, GITI_WINDOW_STACK_TOP);
         bool claimed = false;
 
