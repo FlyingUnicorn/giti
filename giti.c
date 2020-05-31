@@ -825,17 +825,17 @@ giti_commit_action(void* c_, uint32_t action_id, giti_window_opt_t* opt)
     giti_commit_t* c = c_;
 
     bool claimed = true;
-    if (action_id == (uint32_t)g_config->keybinding.commit.info) {
+    if (action_id == (uint32_t)g_config->keybinding.commit.info.wch) {
         opt->text = giti_commit_info(c);
         opt->type = S_ITEM_TYPE_TEXT;
         opt->cb_title = giti_commit_info_title_str;
         opt->cb_arg = c;
         opt->xmax = -1;
     }
-    else if (action_id == (uint32_t)g_config->keybinding.commit.show) {
+    else if (action_id == (uint32_t)g_config->keybinding.commit.show.wch) {
         giti_commit_diff(c);
     }
-    else if (action_id == (uint32_t)g_config->keybinding.commit.files) {
+    else if (action_id == (uint32_t)g_config->keybinding.commit.files.wch) {
         opt->text = giti_commit_files(c);
         opt->type = S_ITEM_TYPE_TEXT;
         opt->cb_title = giti_commit_files_title_str;
@@ -861,7 +861,7 @@ giti_commit_action(void* c_, uint32_t action_id, giti_window_opt_t* opt)
         item->type = S_ITEM_TYPE_TEXT;
         item->cb_arg = c;
         item->cb_action = giti_commit_action;
-        item->action_id = g_config->keybinding.commit.info;
+        item->action_id = g_config->keybinding.commit.info.wch;
         snprintf(item->name, sizeof(item->name), "Show commit info    [%s]",
                  giti_config_key_to_string(item->action_id, strbuf));
         dlist_append(gwm->menu, item);
@@ -870,7 +870,7 @@ giti_commit_action(void* c_, uint32_t action_id, giti_window_opt_t* opt)
         item->type = S_ITEM_TYPE_ACTION;
         item->cb_arg = c;
         item->cb_action = giti_commit_action;
-        item->action_id = g_config->keybinding.commit.show;
+        item->action_id = g_config->keybinding.commit.show.wch;
         snprintf(item->name, sizeof(item->name), "Open commit diff    [%s]",
                  giti_config_key_to_string(item->action_id, strbuf));
         dlist_append(gwm->menu, item);
@@ -879,7 +879,7 @@ giti_commit_action(void* c_, uint32_t action_id, giti_window_opt_t* opt)
         item->type = S_ITEM_TYPE_TEXT;
         item->cb_arg = c;
         item->cb_action = giti_commit_action;
-        item->action_id = g_config->keybinding.commit.files;
+        item->action_id = g_config->keybinding.commit.files.wch;
         snprintf(item->name, sizeof(item->name), "Show commit files   [%s]",
                  giti_config_key_to_string(item->action_id, strbuf));
         dlist_append(gwm->menu, item);
@@ -1084,25 +1084,25 @@ giti_log_shortcut(void* gl_, uint32_t wch, uint32_t action_id, giti_window_opt_t
         }
     }
     else {
-        if (wch == g_config->keybinding.log.my) {
+        if (wch == g_config->keybinding.log.my.wch) {
             gl->filter.self = !gl->filter.self;
         }
-        else if (wch == g_config->keybinding.log.friends) {
+        else if (wch == g_config->keybinding.log.friends.wch) {
             gl->filter.friends = !gl->filter.friends;
         }
-        else if (wch == g_config->keybinding.log.filter) {
+        else if (wch == g_config->keybinding.log.filter.wch) {
             gl->filter.active   = true;
             gl->filter.show_all = false;
             gl->filter.str_pos  = 0;
             memset(gl->filter.str, 0, sizeof(gl->filter.str));
         }
-        else if (wch == g_config->keybinding.log.highlight) {
+        else if (wch == g_config->keybinding.log.highlight.wch) {
             gl->filter.active   = true;
             gl->filter.show_all = true;
             gl->filter.str_pos  = 0;
             memset(gl->filter.str, 0, sizeof(gl->filter.str));
         }
-        else if (wch == g_config->keybinding.back || wch == ESC) {
+        else if (wch == g_config->keybinding.back.wch || wch == ESC) {
             if (gl->filter.str_pos) {
                 gl->filter.str_pos  = 0;
                 gl->filter.show_all = false;
@@ -1312,7 +1312,7 @@ giti_branch_action(void* b_, uint32_t action_id, giti_window_opt_t* opt)
 
     bool claimed = true;
 
-    if (action_id == g_config->keybinding.logs) {
+    if (action_id == g_config->keybinding.logs.wch) {
         //log("log %s", b->name);
         *opt = giti_log_create(b->name, 10000);
     }
@@ -1335,7 +1335,7 @@ giti_branch_action(void* b_, uint32_t action_id, giti_window_opt_t* opt)
         item->type = S_ITEM_TYPE_MENU;
         item->cb_arg = b;
         item->cb_action = giti_branch_action;
-        item->action_id = g_config->keybinding.logs;
+        item->action_id = g_config->keybinding.logs.wch;
         snprintf(item->name, sizeof(item->name), "Show branch log    [%s]",
                  giti_config_key_to_string(item->action_id, strbuf));
 
@@ -1521,10 +1521,10 @@ giti_summary_action(void* gs_, uint32_t action_id, giti_window_opt_t* opt)
     giti_summary_t* gs = gs_;
 
     bool claimed = true;
-    if (action_id == g_config->keybinding.logs) {
+    if (action_id == g_config->keybinding.logs.wch) {
         *opt = giti_log_create(gs->branch, 50000);
     }
-    else if (action_id == g_config->keybinding.branches) {
+    else if (action_id == g_config->keybinding.branches.wch) {
         *opt = giti_branches_create(gs->branch, gs->branches);
     }
     else if (action_id == ' ') {
@@ -1544,7 +1544,7 @@ giti_summary_action(void* gs_, uint32_t action_id, giti_window_opt_t* opt)
         item->type      = S_ITEM_TYPE_MENU;
         item->cb_arg    = gs;
         item->cb_action = giti_summary_action;
-        item->action_id = g_config->keybinding.logs;
+        item->action_id = g_config->keybinding.logs.wch;
         snprintf(item->name, sizeof(item->name), "Show log         [%s]",
                  giti_config_key_to_string(item->action_id, strbuf));
         dlist_append(gwm->menu, item);
@@ -1553,7 +1553,7 @@ giti_summary_action(void* gs_, uint32_t action_id, giti_window_opt_t* opt)
         item->type      = S_ITEM_TYPE_MENU;
         item->cb_arg    = gs;
         item->cb_action = giti_summary_action;
-        item->action_id = g_config->keybinding.branches;
+        item->action_id = g_config->keybinding.branches.wch;
         snprintf(item->name, sizeof(item->name), "Show branches    [%s]",
                  giti_config_key_to_string(item->action_id, strbuf));
         dlist_append(gwm->menu, item);
@@ -1571,10 +1571,10 @@ giti_summary_shortcut(void* gs_, uint32_t wch, uint32_t action_id, giti_window_o
     giti_summary_t* gs = gs_;
 
     bool claimed = false;
-    if (wch == g_config->keybinding.logs || wch == g_config->keybinding.branches || wch == ' ') {
+    if (wch == g_config->keybinding.logs.wch || wch == g_config->keybinding.branches.wch || wch == ' ') {
         claimed = giti_summary_action(gs, action_id ? action_id : wch, opt);
     }
-    else if (wch == g_config->keybinding.help) {
+    else if (wch == g_config->keybinding.help.wch) {
         opt->text     = giti_summary_help(gs);
         opt->type     = S_ITEM_TYPE_TEXT;
         opt->cb_title = giti_summary_help_title_str;
@@ -1968,25 +1968,25 @@ main()
         }
 
         if (!claimed) {
-            if (wch == g_config->keybinding.back || wch == ESC) {
+            if (wch == g_config->keybinding.back.wch || wch == ESC) {
                 if (giti_window_stack_pop(gws)) {
                     goto exit;
                 }
             }
-            else if (wch == KEY_UP || wch == g_config->keybinding.up || wch == KEY_PPAGE ||
-                     wch == g_config->keybinding.up_page) {
+            else if (wch == KEY_UP || wch == g_config->keybinding.up.wch || wch == KEY_PPAGE ||
+                     wch == g_config->keybinding.up_page.wch) {
 
                 int i = 1;
                 i = wch == KEY_PPAGE ? 15 : i;
-                i = wch == g_config->keybinding.up_page ? tw->ymax - 2 : i;
+                i = wch == g_config->keybinding.up_page.wch ? tw->ymax - 2 : i;
                 tw->pos = MAX(0, tw->pos - i);
             }
-            else if (wch == KEY_DOWN || wch == g_config->keybinding.down || wch == KEY_NPAGE ||
-                     wch == g_config->keybinding.down_page) {
+            else if (wch == KEY_DOWN || wch == g_config->keybinding.down.wch || wch == KEY_NPAGE ||
+                     wch == g_config->keybinding.down_page.wch) {
 
                 int i = 1;
                 i = wch == KEY_NPAGE ? 15 : i;
-                i = wch == g_config->keybinding.down_page ? tw->ymax - 2 : i;
+                i = wch == g_config->keybinding.down_page.wch ? tw->ymax - 2 : i;
                 tw->pos = MIN(giti_window_posmax(tw), tw->pos + i);
             }
         }

@@ -31,35 +31,35 @@ typedef enum group {
     COLOR,
 } group_t;
 
-#define CONFIG                                                                                               \
-  X(GENERAL,    "general.timeout",          VALUE,     (uint32_t)500,       config.general.timeout)          \
-  X(GENERAL,    "general.user_name",        VALUE,     NULL,                config.general.user_name)        \
-  X(GENERAL,    "general.user_email",       VALUE,     NULL,                config.general.user_email)       \
-  X(KEYBINDING, "keybinding.upx",           KEY,       "k",                 config.keybinding.up)            \
-  X(KEYBINDING, "keybinding.downx",         KEY,       "j",                 config.keybinding.down)          \
-  X(KEYBINDING, "keybinding.up_page",       KEY,       "META+k",            config.keybinding.up_page)       \
-  X(KEYBINDING, "keybinding.down_page",     KEY,       "META+j",            config.keybinding.down_page)     \
-  X(KEYBINDING, "keybinding.back",          KEY,       "q",                 config.keybinding.back)          \
-  X(KEYBINDING, "keybinding.help",          KEY,       "?",                 config.keybinding.help)          \
-  X(KEYBINDING, "keybinding.logs",          KEY,       "l",                 config.keybinding.logs)          \
-  X(KEYBINDING, "keybinding.branches",      KEY,       "b",                 config.keybinding.branches)      \
-  X(KEYBINDING, "keybinding.log.filter",    KEY,       "s",                 config.keybinding.log.filter)    \
-  X(KEYBINDING, "keybinding.log.highlight", KEY,       "META+s",            config.keybinding.log.highlight) \
-  X(KEYBINDING, "keybinding.log.my",        KEY,       "m",                 config.keybinding.log.my)        \
-  X(KEYBINDING, "keybinding.log.friends",   KEY,       "META+m",            config.keybinding.log.friends)   \
-  X(KEYBINDING, "keybinding.commit.info",   KEY,       "i",                 config.keybinding.commit.info)   \
-  X(KEYBINDING, "keybinding.commit.files",  KEY,       "f",                 config.keybinding.commit.files)  \
-  X(KEYBINDING, "keybinding.commit.show",   KEY,       "d",                 config.keybinding.commit.show)   \
-  X(FRIENDS,    "friends",                  LIST,       NULL,               config.friends)                  \
-  X(COLOR,      "color.fgm",                COLOR_CODE, (uint32_t)0xD1F2EB, config.color.fg.c)               \
-  X(COLOR,      "color.bgm",                COLOR_CODE, (uint32_t)0x34495E, config.color.bg.c)               \
-  X(COLOR,      "color.bg_selected",        COLOR_CODE, (uint32_t)0x78909C, config.color.bg_selected.c)      \
-  X(COLOR,      "color.fg1",                COLOR_CODE, (uint32_t)0xE74C3C, config.color.fg1.c)              \
-  X(COLOR,      "color.fg2",                COLOR_CODE, (uint32_t)0x82E0AA, config.color.fg2.c)              \
-  X(COLOR,      "color.fg3",                COLOR_CODE, (uint32_t)0xEDBB99, config.color.fg3.c)              \
-  X(COLOR,      "color.on",                 COLOR_CODE, (uint32_t)0x00FF00, config.color.on.c)               \
-  X(COLOR,      "color.off",                COLOR_CODE, (uint32_t)0xFF0000, config.color.off.c)              \
-  X(COLOR,      "color.inactive",           COLOR_CODE, (uint32_t)0x78909C, config.color.inactive.c)         \
+#define CONFIG                                                                                       \
+  X(GENERAL,    "general.timeout",          VALUE,     "500",       config.general.timeout)          \
+  X(GENERAL,    "general.user_name",        VALUE,     NULL,        config.general.user_name)        \
+  X(GENERAL,    "general.user_email",       VALUE,     NULL,        config.general.user_email)       \
+  X(KEYBINDING, "keybinding.upx",           KEY,       "k",         config.keybinding.up)            \
+  X(KEYBINDING, "keybinding.downx",         KEY,       "j",         config.keybinding.down)          \
+  X(KEYBINDING, "keybinding.up_page",       KEY,       "META-k",    config.keybinding.up_page)       \
+  X(KEYBINDING, "keybinding.down_page",     KEY,       "META-j",    config.keybinding.down_page)     \
+  X(KEYBINDING, "keybinding.back",          KEY,       "q",         config.keybinding.back)          \
+  X(KEYBINDING, "keybinding.help",          KEY,       "?",         config.keybinding.help)          \
+  X(KEYBINDING, "keybinding.logs",          KEY,       "l",         config.keybinding.logs)          \
+  X(KEYBINDING, "keybinding.branches",      KEY,       "b",         config.keybinding.branches)      \
+  X(KEYBINDING, "keybinding.log.filter",    KEY,       "s",         config.keybinding.log.filter)    \
+  X(KEYBINDING, "keybinding.log.highlight", KEY,       "META-s",    config.keybinding.log.highlight) \
+  X(KEYBINDING, "keybinding.log.my",        KEY,       "m",         config.keybinding.log.my)        \
+  X(KEYBINDING, "keybinding.log.friends",   KEY,       "META-m",    config.keybinding.log.friends)   \
+  X(KEYBINDING, "keybinding.commit.info",   KEY,       "i",         config.keybinding.commit.info)   \
+  X(KEYBINDING, "keybinding.commit.files",  KEY,       "f",         config.keybinding.commit.files)  \
+  X(KEYBINDING, "keybinding.commit.show",   KEY,       "d",         config.keybinding.commit.show)   \
+  X(FRIENDS,    "friends",                  LIST,       NULL,       config.friends)                  \
+  X(COLOR,      "color.fgm",                COLOR_CODE, "0xD1F2EB", config.color.fg)                 \
+  X(COLOR,      "color.bgm",                COLOR_CODE, "0x34495E", config.color.bg)                 \
+  X(COLOR,      "color.bg_selected",        COLOR_CODE, "0x78909C", config.color.bg_selected)        \
+  X(COLOR,      "color.fg1",                COLOR_CODE, "0xE74C3C", config.color.fg1)                \
+  X(COLOR,      "color.fg2",                COLOR_CODE, "0x82E0AA", config.color.fg2)                \
+  X(COLOR,      "color.fg3",                COLOR_CODE, "0xEDBB99", config.color.fg3)                \
+  X(COLOR,      "color.on",                 COLOR_CODE, "0x00FF00", config.color.on)                 \
+  X(COLOR,      "color.off",                COLOR_CODE, "0xFF0000", config.color.off)                \
+  X(COLOR,      "color.inactive",           COLOR_CODE, "0x78909C", config.color.inactive)           \
 
 
 size_t
@@ -99,12 +99,43 @@ snprintf_string(char* buf, size_t buf_sz, int pad, const char* header, op_t op, 
   switch (op) {
     case KEY:
     case VALUE:
+    case COLOR_CODE:
       written = snprintf(buf, buf_sz, "%s:", header);
       written += snprintf(buf += written, buf_sz - written, "%*s%s", (int)(pad-written), "", val);
       break;
     default:
       abort();
   }
+
+  return written;
+}
+
+size_t
+snprintf_color(char* buf, size_t buf_sz, int pad, const char* header, op_t op, giti_color_t color)
+{
+  size_t written = 0;
+  written = snprintf(buf, buf_sz, "%s:", header);
+  written += snprintf(buf += written, buf_sz - written, "%*s0x%06x", (int)(pad-written), "", color.c);
+
+  return written;
+}
+
+size_t
+snprintf_keybinding(char* buf, size_t buf_sz, int pad, const char* header, op_t op, giti_keybinding_t keybinding)
+{
+  size_t written = 0;
+  written = snprintf(buf, buf_sz, "%s:", header);
+  written += snprintf(buf + written, buf_sz - written, "%*s", (int)(pad-written), "");
+
+  if (keybinding.ctrl) {
+    written += snprintf(buf + written, buf_sz - written, "%s", "CTRL");
+  }
+  else if (keybinding.meta) {
+    written += snprintf(buf + written, buf_sz - written, "%s", "META-");
+  }
+  written += snprintf(buf + written, buf_sz - written, "%c", keybinding.ch);
+
+  log_debug("%s = %s", header, buf);
 
   return written;
 }
@@ -129,9 +160,11 @@ snprintf_data(char* buf, size_t buf_sz, int pad, const char* header, op_t op, vo
 }
 
 #define snprintf_param(ptr, buf, buf_sz, pad, header, op) _Generic( (ptr), \
-    unsigned int: snprintf_uint,                                           \
-    char*:        snprintf_string,                                         \
-    default:      snprintf_data                                            \
+  unsigned int:      snprintf_uint,                                        \
+  char*:             snprintf_string,                                      \
+  giti_color_t:      snprintf_color,                                       \
+  giti_keybinding_t: snprintf_keybinding,                                  \
+  default:           snprintf_data                                         \
 ) (buf, buf_sz, pad, header, op, ptr)
 
 void
@@ -166,6 +199,27 @@ format_string(op_t op, const char* str, void* ptr)
 }
 
 void
+format_color(op_t op, const char* str, void* ptr)
+{
+  giti_color_t* color = ptr;
+  color->c = strtoul(str, NULL, 16);
+}
+
+void
+format_keybinding(op_t op, const char* str, void* ptr)
+{
+  giti_keybinding_t* keybinding = ptr;
+  keybinding->ctrl = strncmp(str, "CTRL-", strlen("CTRL-")) == 0;
+  keybinding->meta = strncmp(str, "META-", strlen("META-")) == 0;
+
+  keybinding->ch = keybinding->ctrl || keybinding->meta ? str[5] : str[0];
+
+  keybinding->wch = keybinding->ch;
+  keybinding->wch += keybinding->ctrl ? -96 : 0;
+  keybinding->wch += keybinding->meta ? 128 : 0;
+}
+
+void
 format_data(op_t op, const char* str, void* ptr)
 {
   (void)str;
@@ -180,9 +234,11 @@ format_data(op_t op, const char* str, void* ptr)
 }
 
 #define set_param(ptr, op, str) _Generic( (ptr), \
-    unsigned int*: format_uint,                  \
-    char**:        format_string,                \
-    default:       format_data                   \
+  unsigned int*:      format_uint,               \
+  char**:             format_string,             \
+  giti_color_t*:      format_color,              \
+  giti_keybinding_t*: format_keybinding,         \
+  default:            format_data                \
 ) (op, str, ptr)
 
 static char*
