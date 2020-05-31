@@ -52,8 +52,8 @@ typedef enum group {
   X(KEYBINDING, "keybinding.commit.show",   KEY,       "d",         config.keybinding.commit.show)   \
   X(FRIENDS,    "friends",                  LIST,       NULL,       config.friends)                  \
   X(COLOR,      "color.fgm",                COLOR_CODE, "0xD1F2EB", config.color.fg)                 \
-  X(COLOR,      "color.bgm",                COLOR_CODE, "0x34495E", config.color.bg)                 \
-  X(COLOR,      "color.bg_selected",        COLOR_CODE, "0x78909C", config.color.bg_selected)        \
+  X(COLOR,      "color.bgm",                COLOR_CODE, "0x000000", config.color.bg)                 \
+  X(COLOR,      "color.bg_selected",        COLOR_CODE, "0x0277BD", config.color.bg_selected)        \
   X(COLOR,      "color.fg1",                COLOR_CODE, "0xE74C3C", config.color.fg1)                \
   X(COLOR,      "color.fg2",                COLOR_CODE, "0x82E0AA", config.color.fg2)                \
   X(COLOR,      "color.fg3",                COLOR_CODE, "0xEDBB99", config.color.fg3)                \
@@ -65,30 +65,11 @@ typedef enum group {
 size_t
 snprintf_uint(char* buf, size_t buf_sz, int pad, const char* header, op_t op, unsigned int val)
 {
-  size_t written = 0;
-  switch (op) {
-    case KEY: {
-      char                     str_val[32];
-      size_t                   pos    = 0;
-      giti_config_key_strbuf_t strbuf = { 0 };
-      pos += snprintf(str_val + pos, sizeof(str_val) - pos, "%s", giti_config_key_to_string(val, strbuf));
+  assert(op == VALUE);
 
-      written = snprintf(buf, buf_sz, "%s:", header);
-      written += snprintf(buf += written, buf_sz - written, "%*s%s", (int)(pad-written), "", str_val);
-      break;
-    }
-    case VALUE: {
-      written = snprintf(buf, buf_sz, "%s:", header);
-      written += snprintf(buf += written, buf_sz - written, "%*s%u", (int)(pad-written), "", val);
-      break;
-    }
-    case COLOR_CODE:
-      written = snprintf(buf, buf_sz, "%s:", header);
-      written += snprintf(buf += written, buf_sz - written, "%*s0x%06x", (int)(pad-written), "", val);
-      break;
-    default:
-      abort();
-  }
+  size_t written = 0;
+  written = snprintf(buf, buf_sz, "%s:", header);
+  written += snprintf(buf += written, buf_sz - written, "%*s%u", (int)(pad-written), "", val);
   return written;
 }
 
@@ -113,6 +94,8 @@ snprintf_string(char* buf, size_t buf_sz, int pad, const char* header, op_t op, 
 size_t
 snprintf_color(char* buf, size_t buf_sz, int pad, const char* header, op_t op, giti_color_t color)
 {
+  assert(op == COLOR_CODE);
+
   size_t written = 0;
   written = snprintf(buf, buf_sz, "%s:", header);
   written += snprintf(buf += written, buf_sz - written, "%*s0x%06x", (int)(pad-written), "", color.c);
@@ -123,6 +106,8 @@ snprintf_color(char* buf, size_t buf_sz, int pad, const char* header, op_t op, g
 size_t
 snprintf_keybinding(char* buf, size_t buf_sz, int pad, const char* header, op_t op, giti_keybinding_t keybinding)
 {
+  assert(op == KEY);
+
   size_t written = 0;
   written = snprintf(buf, buf_sz, "%s:", header);
   written += snprintf(buf + written, buf_sz - written, "%*s", (int)(pad-written), "");
@@ -392,11 +377,11 @@ giti_config_key_to_string(uint32_t key, giti_config_key_strbuf_t strbuf)
   size_t pos = 0;
 
   if (key >= 1 && key <= 24) { /* CTRL+a - CTRL+x */
-    pos += snprintf(strbuf, sizeof(&strbuf), "CTRL+");
+    pos += snprintf(strbuf, sizeof(&strbuf), "CTRL-");
     key += 96; /* change to A - z char */
   }
   else if (key >= 225 && key <= 255) { /* META+a - META+z */
-    pos += snprintf(strbuf, sizeof(&strbuf), "META+");
+    pos += snprintf(strbuf, sizeof(&strbuf), "META-");
     key = 97 + (key - 225);
   }
 
