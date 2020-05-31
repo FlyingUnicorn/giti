@@ -50,7 +50,7 @@ typedef enum group {
   X(KEYBINDING, "keybinding.commit.info",   KEY,       "i",         config.keybinding.commit.info)   \
   X(KEYBINDING, "keybinding.commit.files",  KEY,       "f",         config.keybinding.commit.files)  \
   X(KEYBINDING, "keybinding.commit.show",   KEY,       "d",         config.keybinding.commit.show)   \
-  X(FRIENDS,    "friends",                  LIST,       NULL,       config.friends)                  \
+  X(FRIENDS,    "friend",                   LIST,       NULL,       config.friends)                  \
   X(COLOR,      "color.fgm",                COLOR_CODE, "0xD1F2EB", config.color.fg)                 \
   X(COLOR,      "color.bgm",                COLOR_CODE, "0x000000", config.color.bg)                 \
   X(COLOR,      "color.bg_selected",        COLOR_CODE, "0x0277BD", config.color.bg_selected)        \
@@ -120,7 +120,7 @@ snprintf_keybinding(char* buf, size_t buf_sz, int pad, const char* header, op_t 
   }
   written += snprintf(buf + written, buf_sz - written, "%c", keybinding.ch);
 
-  log_debug("%s = %s", header, buf);
+  //log_debug("%s = %s", header, buf);
 
   return written;
 }
@@ -210,7 +210,7 @@ format_data(op_t op, const char* str, void* ptr)
   (void)str;
   switch (op) {
     case LIST:
-      dlist_append((dlist_t*)ptr, strdup(str));
+      dlist_append(*(dlist_t**)ptr, strdup(str));
       break;
     default:
       log("failed: %s", str);

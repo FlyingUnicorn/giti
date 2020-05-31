@@ -1904,10 +1904,18 @@ main()
     setlocale(LC_ALL, "");
     log("-- START --");
 
-    const char* path_config = getenv("GITI_CONFIG_FILE"); /* add this to help */
-    if (!path_config) {
-        path_config = "~/.gitirc";
+    giti_strbuf_t path_config = { 0 };
+
+    const char* path_env_config = getenv("GITI_CONFIG_FILE"); /* add this to help */
+    if (path_env_config) {
+        snprintf(path_config, sizeof(path_config), "%s", path_env_config);
     }
+    else {
+        const char* path_home = getenv("HOME");
+        snprintf(path_config, sizeof(path_config), "%s/.giticonfig", path_home);
+
+    }
+
     char* str_config = NULL;
     FILE* f = fopen(path_config, "r");
     if (f) {
@@ -1919,11 +1927,18 @@ main()
         fclose(f);
     }
 
+    log("config read file: %s", path_config);
+
     char* user_name = giti_user_name();
     char* user_email = giti_user_email();
     g_config = giti_config_create(str_config, user_name, user_email);
     free(user_name);
     free(user_email);
+
+    char* str_config2 = giti_config_to_string(g_config);
+    //log("%s", str_config2);
+    free(str_config2);
+
 
     char* current_branch = giti_current_branch();
 
