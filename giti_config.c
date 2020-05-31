@@ -60,7 +60,7 @@ typedef enum group {
   X(COLOR,      "color.on",                 COLOR_CODE, "0x00FF00", config.color.on)                 \
   X(COLOR,      "color.off",                COLOR_CODE, "0xFF0000", config.color.off)                \
   X(COLOR,      "color.inactive",           COLOR_CODE, "0x78909C", config.color.inactive)           \
-
+  X(COLOR,      "color.friend",             COLOR_CODE, "0xC39BD3", config.color.friend)             \
 
 size_t
 snprintf_uint(char* buf, size_t buf_sz, int pad, const char* header, op_t op, unsigned int val)
@@ -207,7 +207,6 @@ format_keybinding(op_t op, const char* str, void* ptr)
 void
 format_data(op_t op, const char* str, void* ptr)
 {
-  (void)str;
   switch (op) {
     case LIST:
       dlist_append(*(dlist_t**)ptr, strdup(str));

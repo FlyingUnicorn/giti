@@ -119,7 +119,11 @@ strlen_formatted(const char* str)
             ch += strlen("<giti-clr-inactive>") - 1;
             continue;
         }
-        else if (strncmp(ch, "<giti-clr-end>", strlen("<giti-clr-end>")) == 0) {
+        if (strncmp(ch, "<giti-clr-friend>", strlen("<giti-clr-friend>")) == 0) {
+            ch += strlen("<giti-clr-friend>") - 1;
+            continue;
+        }
+        if (strncmp(ch, "<giti-clr-end>", strlen("<giti-clr-end>")) == 0) {
             ch += strlen("<giti-clr-end>") - 1;
             continue;
         }
@@ -148,6 +152,7 @@ giti_color_scheme_init(giti_color_scheme_t* cs)
     init_color(206, convclr(cs->on.r),          convclr(cs->on.b),          convclr(cs->on.g));
     init_color(207, convclr(cs->off.r),         convclr(cs->off.b),         convclr(cs->off.g));
     init_color(208, convclr(cs->inactive.r),    convclr(cs->inactive.b),    convclr(cs->inactive.g));
+    init_color(209, convclr(cs->friend.r),      convclr(cs->friend.b),      convclr(cs->friend.g));
 
     init_pair(1, 200, 201);
     init_pair(2, 203, 201);
@@ -156,6 +161,7 @@ giti_color_scheme_init(giti_color_scheme_t* cs)
     init_pair(5, 206, 201);
     init_pair(6, 207, 201);
     init_pair(7, 208, 201);
+    init_pair(8, 209, 201);
 
     init_pair(11, 200, 202);
     init_pair(12, 203, 202);
@@ -164,6 +170,7 @@ giti_color_scheme_init(giti_color_scheme_t* cs)
     init_pair(15, 206, 202);
     init_pair(16, 207, 202);
     init_pair(17, 208, 202);
+    init_pair(18, 209, 202);
 }
 
 static int
@@ -229,6 +236,13 @@ giti_print(WINDOW* w, dlist_t* color_filter, int y, int x, int xmax, const char*
             else if (wcsncmp(ch, L"<giti-clr-end>", wcslen(L"<giti-clr-end>")) == 0) {
                 filter_clr = 0;
                 ch += wcslen(L"<giti-clr-end>");
+                --i;
+                continue;
+            }
+
+            else if (wcsncmp(ch, L"<giti-clr-friend>", wcslen(L"<giti-clr-friend>")) == 0) {
+                filter_clr = 7;
+                ch += wcslen(L"<giti-clr-friend>");
                 --i;
                 continue;
             }
@@ -707,7 +721,7 @@ giti_commit_row(giti_strbuf_t strbuf, void* e_)
         pos += snprintf(strbuf + pos, sizeof(giti_strbuf_t) - pos, " <giti-clr-1>%*s<giti-clr-end>", g_config->format.max_width_name, str_name);
     }
     else if (e->is_friend) {
-        pos += snprintf(strbuf + pos, sizeof(giti_strbuf_t) - pos, " <giti-clr-on>%*s<giti-clr-end>", g_config->format.max_width_name, str_name);
+        pos += snprintf(strbuf + pos, sizeof(giti_strbuf_t) - pos, " <giti-clr-friend>%*s<giti-clr-end>", g_config->format.max_width_name, str_name);
     }
     else {
         pos += snprintf(strbuf + pos, sizeof(giti_strbuf_t) - pos, " %*s", g_config->format.max_width_name, str_name);

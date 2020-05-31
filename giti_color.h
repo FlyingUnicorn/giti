@@ -25,6 +25,7 @@ typedef struct giti_color_scheme {
     giti_color_t on;
     giti_color_t off;
     giti_color_t inactive;
+    giti_color_t friend;
 } giti_color_scheme_t;
 
 #endif
