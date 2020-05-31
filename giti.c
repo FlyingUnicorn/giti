@@ -1725,12 +1725,38 @@ typedef struct giti_window_stack {
     giti_window_t* stack[25];
 } giti_window_stack_t;
 
+typedef enum giti_window_pos {
+  INVALID,
+  CENTER,
+  LEFT,
+  RIGHT,
+  TOP,
+  BOTTOM,
+} giti_window_pos_t;
+
 static void
 giti_window_stack_push(giti_window_stack_t* gws, giti_window_opt_t opt)
 {
     if (gws->stack_pos < 25 - 1) {
         giti_window_t* w = giti_window_create(opt);
-        w->w = subwin(gws->stack[0]->w, giti_window_ymax(w), giti_window_xmax(w), 0, 0);
+        log_debug("ymax: %lu, pos: %d, xmax: %lu, ymax: %lu, COLS: %u, LINES: %u partent_pos: %d", w->ymax, w->pos, giti_window_xmax(w), giti_window_ymax(w), COLS, LINES, gws->stack[gws->stack_pos]->pos);
+
+        int x = 0;
+        int y = 0;
+
+        giti_window_pos_t xpos = CENTER;
+        giti_window_pos_t ypos = BOTTOM;
+
+        bool follow = true;
+
+        x = xpos == CENTER && COLS > giti_window_xmax(w) ? (COLS - giti_window_xmax(w)) / 2 : x;
+        x = xpos == RIGHT && COLS > giti_window_ymax(w) ? (COLS - giti_window_xmax(w)) : x;
+
+        y = ypos == CENTER && LINES > giti_window_ymax(w) ? (LINES - giti_window_ymax(w)) / 2 : y;
+        y = ypos == BOTTOM && LINES > giti_window_ymax(w) ? LINES - giti_window_ymax(w) : y;
+        y = follow && LINES > (gws->stack[gws->stack_pos]->pos + giti_window_ymax(w) + 2 * gws->stack_pos) ? gws->stack[gws->stack_pos]->pos + 2 * gws->stack_pos : y;
+
+        w->w = subwin(gws->stack[0]->w, giti_window_ymax(w), giti_window_xmax(w), y, x);
         gws->stack[++gws->stack_pos] = w;
     }
 }
