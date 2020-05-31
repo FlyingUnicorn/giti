@@ -43,7 +43,7 @@ strlines(const char* str)
 {
     int lines = 0;
     for (const char* ch = str; *ch; ++ch) {
-        if (*ch == '\n') {
+        if (*ch == '\n' || (*ch && lines == 0)) {
             ++lines;
         }
     }

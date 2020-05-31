@@ -297,6 +297,7 @@ window_title(WINDOW* w, int max, const char* title)
 static size_t
 giti_window_len(const giti_window_t* s)
 {
+    /* available entries */
     size_t res = 0;
 
     switch (s->opt.type) {
@@ -304,7 +305,7 @@ giti_window_len(const giti_window_t* s)
         res = dlist_size(s->opt.menu);
         break;
     case S_ITEM_TYPE_TEXT:
-        res = strlines(s->opt.text) + 1;
+        res = strlines(s->opt.text);
         break;
     default:
         break;
@@ -364,6 +365,7 @@ giti_window_set_xmax(giti_window_t* s)
                 ++len;
             }
         }
+        strlenmax = MAX(len, strlenmax);
         break;
     }
     default:
@@ -723,6 +725,7 @@ giti_commit_info(giti_commit_t* c)
     }
 
     snprintf(c->info, sizeof(giti_strbuf_info_t), "Suject: %s\nAuthor: %s (%s)\nDate:   %s (%s)\n\n%s", c->s, c->an, c->ae, c->ci, c->cr, c->b);
+    strtrim(c->info);
     return c->info;
 }
 
@@ -732,6 +735,7 @@ giti_commit_files(giti_commit_t* c)
     if (!c->files) {
         c->files = giti_commit_files_(c->h);
     }
+    strtrim(c->files);
     return c->files;
 }
 
@@ -1729,7 +1733,7 @@ giti_window_stack_push(giti_window_stack_t* gws, giti_window_opt_t opt)
 {
     if (gws->stack_pos < 25 - 1) {
         giti_window_t* w = giti_window_create(opt);
-        log_debug("ymax: %lu, pos: %d, xmax: %lu, ymax: %lu, COLS: %u, LINES: %u partent_pos: %d", w->ymax, w->pos, giti_window_xmax(w), giti_window_ymax(w), COLS, LINES, gws->stack[gws->stack_pos]->pos);
+        //log_debug("ymax: %lu, pos: %d, xmax: %lu, ymax: %lu, COLS: %u, LINES: %u partent_pos: %d", w->ymax, w->pos, giti_window_xmax(w), giti_window_ymax(w), COLS, LINES, gws->stack[gws->stack_pos]->pos);
 
         int x = 0;
         int y = 0;
@@ -1828,6 +1832,47 @@ giti_window_stack_display(giti_window_stack_t* gws)
             }
         }
         else if (sw->opt.type == S_ITEM_TYPE_TEXT) {
+            bool   selected     = false;               /* selected not available for TEXT */
+            bool   top_window   = i == gws->stack_pos;
+            size_t max_print    = giti_window_len(sw); /* lines available for printing */
+            size_t printed      = 0;                   /* printed lines out of max_print */
+            size_t line_num     = 0;                   /* current line in text buffer */
+            size_t window_lines = LINES - 2;           /* 1 char boarder on each size */
+
+            const char* line_start = sw->opt.text;
+            const char* line_end;
+
+            //log_debug("max_print: %lu lines: %u swymax: %lu", max_print, LINES, sw->ymax);
+
+            giti_strbuf_t strbuf;
+            for (printed = 0, line_num = 0; printed < window_lines; ++line_num) {
+                line_end = strchr(line_start, '\n');
+                if (!line_end) {
+                    line_end = strchr(line_start, '\0');
+                }
+                if (!line_end) {
+                    break;
+                }
+
+                bool scrolling_needed = max_print > window_lines;
+                bool last_line = printed == window_lines - 1;
+                bool more_scrolling = max_print - 1 > line_num;
+                //log_debug("more_scrolling: %lu %ld %u", max_print, line_num, more_scrolling);
+                if (scrolling_needed && last_line && more_scrolling) {
+                    snprintf(strbuf, sizeof(giti_strbuf_t), "%s", "<giti-clr-1>(more below)<giti-clr-end>");
+                    giti_print(sw->w, color_filter, printed + 1, 2, giti_window_lnmax(sw), strbuf, false, i == gws->stack_pos);
+                    ++printed;
+                }
+                else if (!scrolling_needed || line_num > sw->pos) {
+                    snprintf(strbuf, sizeof(giti_strbuf_t), "%.*s", (int)MIN(giti_window_lnmax(sw), line_end - line_start), line_start);
+                    giti_print(sw->w, color_filter, printed + 1, 2, giti_window_lnmax(sw), strbuf, selected, top_window);
+                    ++printed;
+                }
+                line_start = line_end + 1;
+            }
+
+
+#if 0
             char *start, *end;
             start = end = (char*)sw->opt.text;
             for (int n = 0, p = 0; (end = strchr(start, '\n')) && n < giti_window_lnymax(sw); ++p){
@@ -1843,6 +1888,7 @@ giti_window_stack_display(giti_window_stack_t* gws)
                 }
                 start = end + 1;
             }
+#endif
         }
 
         if (color_filter) {
@@ -1949,7 +1995,7 @@ main()
         //log("wch: %d", wch);
 
         if (wch == ESC) {
-            /* key is ALT or ESC - need to determine which */
+            /* key is ALT or ESC - need to determine which by looking for a next char*/
             nodelay(giti_window_stack_get(gws, GITI_WINDOW_STACK_BOTTOM)->w, true);
             wget_wch(giti_window_stack_get(gws, GITI_WINDOW_STACK_BOTTOM)->w, &wch);
             wch = wch ? wch + 128 : ESC;
