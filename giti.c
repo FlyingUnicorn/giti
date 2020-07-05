@@ -581,7 +581,7 @@ giti_current_branch()
     }
     pclose(fp);
 
-    return strtrim(res);
+    return res ? strtrim(res) : NULL;
 }
 
 static void
@@ -1084,6 +1084,7 @@ giti_log_shortcut(void* gl_, uint32_t wch, uint32_t action_id, giti_window_opt_t
     else {
         if (wch == g_config->keybinding.log.my.wch) {
             gl->filter.self = !gl->filter.self;
+
         }
         else if (wch == g_config->keybinding.log.friends.wch) {
             gl->filter.friends = !gl->filter.friends;
@@ -1967,6 +1968,10 @@ main()
 
     char* current_branch = giti_current_branch();
 
+    if (!current_branch) {
+        giti_exit(1, "Not a git repository.");
+    }
+
     initscr();
     start_color();
     noecho();
@@ -2003,6 +2008,12 @@ main()
             claimed = tw->opt.cb_shortcut(tw->opt.cb_arg, wch, item ? item->action_id : 0, &opt);
             if (opt.type) {
                 giti_window_stack_push(gws, opt);
+            }
+            else if (claimed) {
+                tw->pos = 0;
+                if (tw->opt.type == S_ITEM_TYPE_MENU) {
+                    tw->opt.menu.scroll_start = 0;
+                }
             }
         }
         if (!claimed && tw->opt.type == S_ITEM_TYPE_MENU) {
