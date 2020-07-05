@@ -384,11 +384,11 @@ giti_window_lnmax(const giti_window_t* s)
     return giti_window_xmax(s) - 4;
 }
 
-static size_t
-giti_window_lnymax(const giti_window_t* s)
-{
-    return giti_window_ymax(s) - 2;
-}
+//static size_t
+//giti_window_lnymax(const giti_window_t* s)
+//{
+//    return giti_window_ymax(s) - 2;
+//}
 
 static size_t
 giti_window_posmax(const giti_window_t* s)
@@ -622,6 +622,25 @@ giti_branch_rebase(const char* upstream)
     giti_exit(0, path);
 }
 
+static void
+giti_commit_amend(void)
+{
+    FILE *fp;
+    char path[4096];
+
+    char cmd[256];
+    snprintf(cmd, sizeof(path), "git commit --amend");
+    fp = popen(cmd, "r");
+    if (fp == NULL) {
+        giti_exit(1, "Failed to run command");
+    }
+
+    fread(path, sizeof(char), sizeof(path), fp);
+    pclose(fp);
+
+    //giti_exit(0, path);
+}
+
 static char*
 giti_commit_files_(const char* hash)
 {
@@ -667,6 +686,7 @@ typedef struct giti_commit {
     bool is_self;
     bool is_friend;
     giti_strbuf_info_t info;
+    bool top;
 } giti_commit_t;
 
 static void
@@ -841,6 +861,9 @@ giti_commit_action(void* c_, uint32_t action_id, giti_window_opt_t* opt)
         opt->cb_arg = c;
         opt->xmax = -1;
     }
+    else if (action_id == 12347) {
+        giti_commit_amend();
+    }
     else if (action_id == ' ') {
         giti_config_key_strbuf_t strbuf = { 0 };
 
@@ -881,6 +904,16 @@ giti_commit_action(void* c_, uint32_t action_id, giti_window_opt_t* opt)
         snprintf(item->name, sizeof(item->name), "Show commit files   [%s]",
                  giti_config_key_to_string(item->action_id, strbuf));
         dlist_append(gwm->menu, item);
+
+        if (c->top) {
+            item = calloc(1, sizeof *item);
+            item->type = S_ITEM_TYPE_TEXT;
+            item->cb_arg = c;
+            item->cb_action = giti_commit_action;
+            item->action_id = 12347;
+            snprintf(item->name, sizeof(item->name), "Amend commit");
+            dlist_append(gwm->menu, item);
+        }
     }
     else {
         claimed = false;
@@ -977,6 +1010,10 @@ giti_log_entries_(const char* precmd, const char* postcmd, uint32_t max_duration
                 }
             }
             dlist_iterator_destroy(it);
+        }
+
+        if (cnt == 0) {
+            e->top = true;
         }
 
         dlist_append(list, e);
