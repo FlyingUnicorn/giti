@@ -686,7 +686,7 @@ typedef struct giti_commit {
     bool is_self;
     bool is_friend;
     giti_strbuf_info_t info;
-    bool top;
+    size_t indx;
 } giti_commit_t;
 
 static void
@@ -709,7 +709,7 @@ giti_commit_row(giti_strbuf_t strbuf, void* e_)
 {
     giti_commit_t* e = e_;
     size_t pos = 0;
-    pos += snprintf(strbuf + pos, sizeof(giti_strbuf_t) - pos, "%s <giti-clr-2>%s<giti-clr-end> <giti-clr-3>%s<giti-clr-end>", e->h, e->ci_date, e->ci_time);
+    pos += snprintf(strbuf + pos, sizeof(giti_strbuf_t) - pos, "%3lu %s <giti-clr-2>%s<giti-clr-end> <giti-clr-3>%s<giti-clr-end>", e->indx, e->h, e->ci_date, e->ci_time);
 
     char* str_name = malloc(g_config->format.max_width_name);
     snprintf(str_name, g_config->format.max_width_name, "%s", e->an);
@@ -905,7 +905,7 @@ giti_commit_action(void* c_, uint32_t action_id, giti_window_opt_t* opt)
                  giti_config_key_to_string(item->action_id, strbuf));
         dlist_append(gwm->menu, item);
 
-        if (c->top) {
+        if (c->indx == 0) {
             item = calloc(1, sizeof *item);
             item->type = S_ITEM_TYPE_TEXT;
             item->cb_arg = c;
@@ -956,7 +956,16 @@ giti_log_entries_(const char* precmd, const char* postcmd, uint32_t max_duration
 {
     FILE *fp;
     char cmd[512];
-    snprintf(cmd, sizeof(cmd), "git log %s --pretty=format:\"%%<(%d,trunc)%%h %%<(%d,trunc)%%ci %%<(%d,trunc)%%cr %%<(%d,trunc)%%an %%<(%d,trunc)%%ae %%<(%d,trunc)%%s\" %s", precmd ? precmd : "", H_SZ, CI_SZ, CR_SZ, AN_SZ, AE_SZ, S_SZ, postcmd ? postcmd : "");
+    snprintf(cmd, sizeof(cmd), "git log %s --pretty=format:" \
+             "\""                                            \
+             "%%<(%d,trunc)%%h "                             \
+             "%%<(%d,trunc)%%ci "                            \
+             "%%<(%d,trunc)%%cr "                            \
+             "%%<(%d,trunc)%%an "                            \
+             "%%<(%d,trunc)%%ae "                            \
+             "%%<(%d,trunc)%%s"                              \
+             "\" "                                           \
+             "%s", precmd ? precmd : "", H_SZ, CI_SZ, CR_SZ, AN_SZ, AE_SZ, S_SZ, postcmd ? postcmd : "");
 
     fp = popen(cmd, "r");
     if (fp == NULL) {
@@ -1012,10 +1021,7 @@ giti_log_entries_(const char* precmd, const char* postcmd, uint32_t max_duration
             dlist_iterator_destroy(it);
         }
 
-        if (cnt == 0) {
-            e->top = true;
-        }
-
+        e->indx = cnt;
         dlist_append(list, e);
         ++cnt;
 
@@ -1269,7 +1275,7 @@ giti_branch_row(giti_strbuf_t strbuf, void* b_)
     giti_branch_t* b = b_;
 
     size_t pos = 0;
-    pos += snprintf(strbuf + pos, sizeof(giti_strbuf_t) - pos - 1, "%s %s %s %s", b->name, b->commit_date.ci_date, b->commit_date.ci_time, b->commit_date_relative);
+    pos += snprintf(strbuf + pos, sizeof(giti_strbuf_t) - pos - 1, "<giti-clr-2>%s<giti-clr-end> <giti-clr-3>%s<giti-clr-end> %-20s %s", b->commit_date.ci_date, b->commit_date.ci_time, b->commit_date_relative, b->name);
     pos += snprintf(strbuf + pos, sizeof(giti_strbuf_t) - pos - 1, "%s", b->is_current_branch ? " <giti-clr-3>[selected]<giti-clr-end>" : "");
 
      return strbuf;
@@ -2113,7 +2119,5 @@ main()
 exit:
     giti_window_stack_destroy(gws);
     free(current_branch);
-
-    log("-- END --");
-    giti_exit(0, "OK");
+    giti_exit(0, "-- END --");
 }
