@@ -1204,6 +1204,14 @@ giti_log_create(const char* branch, size_t entries)
 typedef struct giti_branch {
     giti_strbuf_t name;
     giti_strbuf_t upstream;
+    union {
+        char ci[CI_SZ + 1];
+        struct {
+            char ci_date[11];
+            char ci_time[8];
+        };
+    } commit_date;
+    giti_strbuf_t commit_date_relative;
     dlist_t*      commits;
     bool          is_current_branch;
 } giti_branch_t;
@@ -1222,13 +1230,12 @@ static char*
 giti_branch_row(giti_strbuf_t strbuf, void* b_)
 {
     giti_branch_t* b = b_;
-    if (b->is_current_branch) {
-        snprintf(strbuf, sizeof(giti_strbuf_t) - 1, "%s <giti-clr-3>[selected]<giti-clr-end>", b->name);
-    }
-    else {
-        snprintf(strbuf, sizeof(giti_strbuf_t) - 1, "%s", b->name);
-    }
-    return strbuf;
+
+    size_t pos = 0;
+    pos += snprintf(strbuf + pos, sizeof(giti_strbuf_t) - pos - 1, "%s %s %s %s", b->name, b->commit_date.ci_date, b->commit_date.ci_time, b->commit_date_relative);
+    pos += snprintf(strbuf + pos, sizeof(giti_strbuf_t) - pos - 1, "%s", b->is_current_branch ? " <giti-clr-3>[selected]<giti-clr-end>" : "");
+
+     return strbuf;
 }
 
 static char*
@@ -1246,7 +1253,12 @@ giti_branch(const char* current_branch)
     FILE *fp;
     char res[4096];
 
-    const char* cmd = "git for-each-ref --format='<giti-start>\n<giti-refname>%(refname:short)\n<giti-upstream>%(upstream:short)\n<giti-end>' --sort=committerdate refs/heads/";
+    const char* cmd = "git for-each-ref --format='<giti-start>\n" \
+        "<giti-refname>%(refname:short)\n"                        \
+        "<giti-upstream>%(upstream:short)\n"                      \
+        "<giti-commit-date>%(committerdate:iso)\n"                \
+        "<giti-commit-date-relative>%(committerdate:relative)"    \
+        "\n<giti-end>' --sort=-committerdate refs/heads/";
     fp = popen(cmd, "r");
     if (fp == NULL) {
         printf("Failed to run command\n" );
@@ -1270,6 +1282,14 @@ giti_branch(const char* current_branch)
         }
         else if (strncmp(res, "<giti-upstream>", strlen("<giti-upstream>")) == 0) {
             strncpy(b->upstream, res + strlen("<giti-upstream>"), sizeof(b->upstream) - 1);
+        }
+        else if (strncmp(res, "<giti-commit-date>", strlen("<giti-commit-date>")) == 0) {
+            strncpy(b->commit_date.ci, res + strlen("<giti-commit-data>"), sizeof(b->commit_date.ci) - 1);
+            b->commit_date.ci[19]      = '\0';
+            b->commit_date.ci_date[10] = '\0';
+        }
+        else if (strncmp(res, "<giti-commit-date-relative>", strlen("<giti-commit-date-relative>")) == 0) {
+            strncpy(b->commit_date_relative, res + strlen("<giti-commit-data-relative>"), sizeof(b->commit_date_relative) - 1);
         }
         else if (strncmp(res, "<giti-end>", strlen("<giti-end>")) == 0) {
             dlist_append(branches, b);
@@ -1918,7 +1938,7 @@ giti_window_stack_create(giti_window_opt_t opt)
  *        uncommited changed
  *        log diff to upstream
  * config
- *  - clenaup memory
+ *  - clenup memory
  *  - create config
  * add option to fetch more log entries
  */
