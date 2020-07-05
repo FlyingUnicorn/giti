@@ -59,8 +59,12 @@ typedef struct giti_window_opt {
     s_item_type_t            type;
     int                      xmax; /* -1 = calc width, 0 = max width, >0 width */
     union {
-        const dlist_t*      menu;
-        const char*         text;
+        struct {
+            const dlist_t*   list;
+            int              scroll_start;
+            int              scroll_pos;
+        } menu;
+        const char*          text;
     };
     void*                    cb_arg;
     void*                    cb_arg_destroy;
@@ -302,7 +306,7 @@ giti_window_len(const giti_window_t* s)
 
     switch (s->opt.type) {
     case S_ITEM_TYPE_MENU:
-        res = dlist_size(s->opt.menu);
+        res = dlist_size(s->opt.menu.list);
         break;
     case S_ITEM_TYPE_TEXT:
         res = strlines(s->opt.text);
@@ -340,9 +344,9 @@ giti_window_set_xmax(giti_window_t* s)
 
     switch (s->opt.type) {
     case S_ITEM_TYPE_MENU: {
-        for (int i = 0; i < dlist_size(s->opt.menu); ++i) {
+        for (int i = 0; i < dlist_size(s->opt.menu.list); ++i) {
 
-            giti_menu_item_t* item = dlist_get(s->opt.menu, i);
+            giti_menu_item_t* item = dlist_get(s->opt.menu.list, i);
 
             if (item->cb_str) {
                 giti_strbuf_t strbuf;
@@ -393,7 +397,7 @@ giti_window_posmax(const giti_window_t* s)
 
     switch (s->opt.type) {
     case S_ITEM_TYPE_MENU:
-        res = dlist_size(s->opt.menu) - 1;
+        res = dlist_size(s->opt.menu.list) - 1;
         break;
     case S_ITEM_TYPE_TEXT:
         res = MAX(0, (int)giti_window_len(s) + 1 - (int)s->ymax);
@@ -842,7 +846,7 @@ giti_commit_action(void* c_, uint32_t action_id, giti_window_opt_t* opt)
 
         giti_window_menu_t* gwm = giti_window_menu_create();
         opt->type = S_ITEM_TYPE_MENU;
-        opt->menu = gwm->menu;
+        opt->menu.list = gwm->menu;
         opt->cb_title = giti_commit_menu_title_str;
         opt->cb_shortcut = giti_commit_shortcut;
         opt->cb_destroy = giti_window_menu_destroy;
@@ -1189,7 +1193,7 @@ giti_log_create(const char* branch, size_t entries)
         .cb_destroy     = giti_log_destroy,
         .cb_arg         = gl,
         .cb_arg_destroy = gl,
-        .menu           = gl->filtered_entries,
+        .menu.list      = gl->filtered_entries,
     };
 
     return opt;
@@ -1314,11 +1318,11 @@ giti_branch_action(void* b_, uint32_t action_id, giti_window_opt_t* opt)
         giti_config_key_strbuf_t strbuf = { 0 };
 
         giti_window_menu_t* gwm = giti_window_menu_create();
-        opt->menu           = gwm->menu;
+        opt->menu.list      = gwm->menu;
         opt->type           = S_ITEM_TYPE_MENU;
         opt->cb_shortcut    = giti_branch_shortcut;
         opt->xmax           = -1;
-        opt->menu           = gwm->menu;
+        opt->menu.list      = gwm->menu;
         opt->cb_title       = giti_branch_menu_title_str;
         opt->cb_destroy     = giti_window_menu_destroy;
         opt->cb_arg         = b;
@@ -1456,7 +1460,7 @@ giti_branches_create(const char* current_branch, dlist_t* branches)
 
     giti_window_opt_t opt = {
         .type           = S_ITEM_TYPE_MENU,
-        .menu           = gb->filtered_branches,
+        .menu.list      = gb->filtered_branches,
         .cb_shortcut    = giti_branches_shortcut,
         .cb_destroy     = giti_branches_destroy,
         .cb_title       = giti_branches_title_str,
@@ -1526,7 +1530,7 @@ giti_summary_action(void* gs_, uint32_t action_id, giti_window_opt_t* opt)
 
         giti_window_menu_t* gwm = giti_window_menu_create();
         opt->type               = S_ITEM_TYPE_MENU;
-        opt->menu               = gwm->menu;
+        opt->menu.list          = gwm->menu;
         opt->cb_shortcut        = giti_summary_shortcut;
         opt->cb_destroy         = giti_window_menu_destroy;
         opt->cb_arg             = gs;
@@ -1816,11 +1820,17 @@ giti_window_stack_display(giti_window_stack_t* gws)
             color_filter = sw->opt.cb_filter(sw->opt.cb_arg);
         }
 
-        if (sw->opt.type == S_ITEM_TYPE_MENU && sw->opt.menu) {
-            int n = MAX(sw->pos - LINES + 3, 0);
-            for (int p = 0; p < MIN((int)dlist_size(sw->opt.menu), LINES - 2); ++n, ++p) {
-                giti_menu_item_t* item = dlist_get(sw->opt.menu, n);
+        if (sw->opt.type == S_ITEM_TYPE_MENU && sw->opt.menu.list) {
+            int scroll_max = sw->opt.menu.scroll_start + LINES - 3;
+            if (sw->pos < sw->opt.menu.scroll_start) {
+                sw->opt.menu.scroll_start = sw->pos;
+            }
+            else if (sw->pos > scroll_max) {
+                sw->opt.menu.scroll_start = sw->pos - LINES + 3;
+            }
 
+            for (int p = 0, n = sw->opt.menu.scroll_start; p < MIN((int)dlist_size(sw->opt.menu.list), LINES - 2); ++n, ++p) {
+                giti_menu_item_t* item = dlist_get(sw->opt.menu.list, n);
                 if (item->cb_str) {
                     giti_strbuf_t strbuf;
                     item->cb_str(strbuf, item->cb_arg);
@@ -1870,25 +1880,6 @@ giti_window_stack_display(giti_window_stack_t* gws)
                 }
                 line_start = line_end + 1;
             }
-
-
-#if 0
-            char *start, *end;
-            start = end = (char*)sw->opt.text;
-            for (int n = 0, p = 0; (end = strchr(start, '\n')) && n < giti_window_lnymax(sw); ++p){
-                giti_strbuf_t strbuf;
-                if (giti_window_posmax(sw) && sw->pos != giti_window_posmax(sw) && i == giti_window_lnymax(sw) - 1) {
-                    snprintf(strbuf, sizeof(giti_strbuf_t), "%s", "<giti-clr-1>(more below)<giti-clr-end>");
-                    giti_print(sw->w, color_filter, n + 1, 2, giti_window_lnmax(sw), strbuf, false, i == gws->stack_pos);
-                }
-                else if (giti_window_len(sw) <= LINES - 7 || (p >= sw->pos && giti_window_len(sw) > LINES - 7)) {
-                    snprintf(strbuf, sizeof(giti_strbuf_t), "%.*s", (int)MIN(giti_window_lnmax(sw), end - start), start);
-                    giti_print(sw->w, color_filter, n + 1, 2, giti_window_lnmax(sw), strbuf, false, i == gws->stack_pos);
-                    ++n;
-                }
-                start = end + 1;
-            }
-#endif
         }
 
         if (color_filter) {
@@ -1916,8 +1907,6 @@ giti_window_stack_create(giti_window_opt_t opt)
 
 /* TODO
  * version number
- * more below not working
- * scrolling
  * dot file
  * git rebase crash
  * git rebase option
@@ -2007,7 +1996,7 @@ main()
 
         giti_menu_item_t* item = NULL;
         if (tw->opt.type == S_ITEM_TYPE_MENU) {
-            item = dlist_get(tw->opt.menu, tw->pos);
+            item = dlist_get(tw->opt.menu.list, tw->pos);
         }
         if (tw->opt.cb_shortcut) {
             giti_window_opt_t opt = { 0 };
